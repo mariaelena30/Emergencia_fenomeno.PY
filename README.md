@@ -1,67 +1,84 @@
-# Emergencia_fenomeno.PY
-# 🌊 Sistema de Monitoreo Institucional - Contingencia Hídrica (Barranqueras 2026)
+# 🌊 Emergencia_fenomeno.PY
 
-Este proyecto es una arquitectura de software *end-to-end* diseñada para el **HackLab + Hackathon 2026 (2HC26)**. Consiste en una plataforma de contingencia para la gestión del riesgo de inundaciones en la cuenca de Barranqueras (Chaco), combinando un motor de datos de alta velocidad en **FastAPI** con un panel operativo geoespacial e interactivo desarrollado en **Streamlit**.
+## Sistema de Monitoreo Institucional - Contingencia Hídrica (Chaco 2026)
 
-La plataforma unifica lecturas hidrométricas oficiales en tiempo real, análisis satelital preliminar de índices de vegetación (NDVI/Sentinel-2) y anomalías macroclimáticas globales (Índice ONI de la NOAA) para actuar como una herramienta clave en la toma de decisiones de Defensa Civil.
+Panel operativo desarrollado para el HackLab + Hackathon 2026 (2HC26), pensado
+como herramienta complementaria de alerta temprana para la gestión del riesgo
+hídrico en la Provincia del Chaco.
 
----
+El dashboard consulta en tiempo real el estado de las **4 cuencas principales**
+de la provincia (Paraná, Paraguay, Bermejo y Pilcomayo) y **12 localidades de
+riesgo** (Resistencia, Barranqueras, Corrientes, Formosa, Puerto Bermejo, El
+Sauzalito, Isla del Cerrito, Puerto Vilelas, La Leonesa, Pampa del Indio,
+Villa Río Bermejito y Fuerte Esperanza), clasificando automáticamente cada
+punto en tres niveles: 🟢 Normal, 🟡 Alerta, 🔴 Evacuación.
 
-## 🏗️ Arquitectura del Sistema
+## 🏗️ Arquitectura del sistema
 
-El ecosistema se divide en dos componentes independientes que se comunican de forma asincrónica mediante peticiones HTTP REST:
+Este proyecto **comparte backend** con el bot de Telegram
+[@cuencas_chaco_bot](https://t.me/cuencas_chaco_bot), para que ambas
+herramientas muestren siempre la misma información, sin datos duplicados
+ni desincronizados.
 
-1. **Backend (`main.py`):** Desarrollado con FastAPI. Actúa como una base de datos en memoria (RAM) de alta velocidad que centraliza la caché de respaldo institucional. Implementa validación estricta de datos mediante Pydantic y un ciclo de vida (`lifespan`) asincrónico para sincronizarse con servicios meteorológicos internacionales.
-2. **Frontend (`app_dashboard.py`):** Desarrollado con Streamlit. Consume los endpoints del backend en tiempo real para generar tarjetas métricas operativas y un mapa interactivo geoespacial utilizando **Folium**, automatizando el cambio de color en los marcadores según los umbrales de alerta del Instituto Nacional del Agua (INA).
+- **Backend (fuente de datos):** repositorio
+  [`cuencas-bot`](https://github.com/mariaelena30/cuencas-bot), desplegado en
+  producción en `https://cuencas-bot.onrender.com`. Desarrollado con FastAPI,
+  centraliza los datos de las 4 cuencas y las 12 localidades.
+- **Frontend (este repo):** `app_dashboard.py`, desarrollado con Streamlit.
+  Consume los endpoints `/cuencas` y `/localidades` del backend para generar
+  tarjetas métricas y un mapa interactivo con Folium, coloreando los
+  marcadores según los umbrales de alerta de cada punto.
+- `main.py` en este repo es una **copia de referencia** del backend (mismo
+  código que `cuencas-bot`), guardada por prolijidad — no se ejecuta en el
+  despliegue de Streamlit Cloud, que solo corre `app_dashboard.py`.
 
----
+## ⚠️ Sobre los datos
 
-## 🛠️ Tecnologías Utilizadas
+Los valores que muestra el dashboard son, por el momento, **datos de
+referencia** (semilla), cargados para poder demostrar el sistema mientras se
+integra una fuente en vivo (INA, Prefectura Naval, Defensa Civil provincial).
+Cada tarjeta y cada marcador del mapa lo indica explícitamente — nunca se
+etiquetan como datos oficiales confirmados sin serlo.
 
-* **Python 3.14+** como lenguaje base del ecosistema.
-* **FastAPI** para el ruteo y exposición de la API de contingencia.
-* **Pydantic** para garantizar la integridad y validación de tipos de datos.
-* **Streamlit** para la construcción ágil del entorno gráfico para los tomadores de decisiones.
-* **Folium & Streamlit-Folium** para el renderizado dinámico de mapas y capas espaciales.
-* **Httpx & Requests** para el consumo de servicios web y comunicación entre componentes.
+## 🛠️ Tecnologías utilizadas
 
----
+- Python 3.11+
+- Streamlit — panel operativo
+- Folium & streamlit-folium — mapa interactivo geoespacial
+- Requests — consumo del backend
 
-## 🚀 Instrucciones de Instalación y Despliegue Local
-
-### 1. Clonar el repositorio e instalar dependencias
-Asegúrese de contar con Python instalado en su sistema operativo. Ejecute el siguiente comando para forzar la instalación correcta de las librerías necesarias:
+## 🚀 Instalación y ejecución local
 
 ```bash
-python -m pip install fastapi uvicorn httpx pydantic streamlit streamlit-folium folium requests
+pip install -r requirements.txt
+streamlit run app_dashboard.py
 ```
 
-### 2. Iniciar el Servidor de Datos (Backend)
-Abra una terminal dentro de la carpeta del proyecto y encienda el motor de FastAPI mediante Uvicorn:
+El dashboard se conecta directo al backend en producción
+(`https://cuencas-bot.onrender.com`), así que no hace falta levantar nada
+más en local para probarlo.
 
-```bash
-python -m uvicorn main:app --reload
-```
-*El servidor estará disponible en la dirección local: `http://127.0.0.1:8000`*
-*Puede acceder a la documentación interactiva autogenerada en: `http://127.0.0`*
+## 🗺️ Umbrales operativos de alerta
 
-### 3. Iniciar el Panel Operativo (Frontend)
-Abra una **segunda terminal** en VS Code sin apagar el backend y ponga en marcha la interfaz gráfica:
+Cada cuenca y localidad tiene su propio umbral, definido en metros. La
+clasificación sigue la misma lógica de tres niveles que usa el Sistema de
+Información y Alerta Hidrológico (SIyAH) del Instituto Nacional del Agua
+(INA), vigente desde 1983 para el monitoreo de la Cuenca del Plata:
 
-```bash
-python -m streamlit run app_dashboard.py
-```
-*El sistema compilará los módulos y abrirá automáticamente su navegador web en la dirección: `http://localhost:8501`*
+- 🟢 **NORMAL** — por debajo del umbral de alerta. Monitoreo pasivo.
+- 🟡 **ALERTA** — nivel igual o superior al umbral de alerta de esa
+  cuenca/localidad. Momento de prestar atención y estar informado.
+- 🔴 **EVACUACIÓN** — nivel igual o superior al umbral de evacuación. Seguir
+  las indicaciones de Defensa Civil.
+
+Esta es una guía orientativa del sistema; ante cualquier alerta real, la
+indicación válida siempre es la que emita Defensa Civil de tu localidad.
+
+## 🔗 Proyectos relacionados
+
+- Bot de Telegram: [@cuencas_chaco_bot](https://t.me/cuencas_chaco_bot)
+- Backend / fuente de datos: [cuencas-bot](https://github.com/mariaelena30/cuencas-bot)
 
 ---
 
-## 🗺️ Umbrales Operativos de Alerta (Estación Barranqueras)
-
-El sistema clasifica automáticamente el estado de la cuenca según las lecturas del hidrómetro oficial en base a los parámetros de Prefectura Naval Argentina:
-
-*   🟢 **Estado NORMAL (< 6.00 metros):** Marcador Verde. Operación habitual y monitoreo pasivo.
-*   🟡 **Estado de ALERTA (≥ 6.00 metros):** Marcador Naranja. Despliegue preventivo de cuadrillas.
-*   🔴 **Estado de EVACUACIÓN (≥ 6.50 metros):** Marcador Rojo. Activación automática del protocolo de contingencia y rescate institucional.
-
----
-**Desarrollado para la Iniciativa Tecnológica Local - Chaco 2026** 🚀
+Desarrollado para la Iniciativa Tecnológica Local - Chaco 2026 🚀
