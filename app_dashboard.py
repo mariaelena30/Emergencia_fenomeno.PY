@@ -185,7 +185,7 @@ def cargar_datos():
 st.markdown(
     """
     <div class="hero-wrap">
-        <span class="hero-eyebrow">2HC26</span>
+        <span class="hero-eyebrow">HackLab + Hackathon 2026 · 2HC26</span>
         <h1 class="hero-title">Portal Hídrico Chaco</h1>
         <p class="hero-sub">Monitoreo en vivo de las 4 cuencas principales y 12 localidades
         de riesgo de la provincia, con la misma información que ves en el bot de Telegram
