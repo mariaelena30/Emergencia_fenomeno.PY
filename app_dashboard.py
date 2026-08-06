@@ -12,6 +12,7 @@ import streamlit as st
 import requests
 import folium
 from streamlit_folium import st_folium
+from datetime import datetime
 
 st.set_page_config(page_title="Portal Hidrico Chaco", layout="wide", page_icon="🌊")
 
@@ -33,13 +34,17 @@ COORDENADAS = {
 }
 
 # ---------------------------------------------------------------------
-# TOKENS VISUALES
+# TOKENS VISUALES — paleta propia: marino casi negro + acentos vivos
+# rosa/violeta/verde, minimalista y de buen contraste.
 # ---------------------------------------------------------------------
 COLOR_ESTADO = {
-    "NORMAL": {"hex": "#3FBF83", "folium": "green", "label": "Normal"},
-    "ALERTA": {"hex": "#F5A623", "folium": "orange", "label": "Alerta"},
-    "EVACUACION": {"hex": "#E4543A", "folium": "red", "label": "Evacuación"},
+    "NORMAL": {"hex": "#2ED573", "folium": "green", "label": "Normal"},
+    "ALERTA": {"hex": "#FFC93C", "folium": "orange", "label": "Alerta"},
+    "EVACUACION": {"hex": "#FF4D6D", "folium": "red", "label": "Evacuación"},
 }
+ACENTO_ROSA = "#EC4899"
+ACENTO_VIOLETA = "#7C5CFC"
+ACENTO_VERDE = "#3DDC84"
 
 CSS = """
 <style>
@@ -48,94 +53,105 @@ CSS = """
 html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
 
 .stApp {
-    background: radial-gradient(circle at 15% 0%, #123B47 0%, #0B2E38 45%, #081F27 100%);
-    color: #F4F7F5;
+    background: #090D1A;
+    color: #F5F6FA;
 }
 
 /* Hero */
-.hero-wrap { padding: 2.2rem 0 1.2rem 0; }
+.hero-wrap { padding: 1.6rem 0 .8rem 0; }
 .hero-eyebrow {
-    font-family: 'Inter', sans-serif; font-weight: 600; letter-spacing: .14em;
-    text-transform: uppercase; font-size: .72rem; color: #7FD4E8;
+    font-family: 'Inter', sans-serif; font-weight: 700; letter-spacing: .16em;
+    text-transform: uppercase; font-size: .72rem; color: #FF4FA3;
     margin-bottom: .6rem; display:block;
 }
 .hero-title {
-    font-family: 'Fraunces', serif; font-weight: 700; font-size: 3rem;
-    line-height: 1.05; color: #F4F7F5; margin: 0 0 .5rem 0;
+    font-family: 'Fraunces', serif; font-weight: 700; font-size: 2.9rem;
+    line-height: 1.05; color: #FFFFFF; margin: 0 0 .5rem 0;
 }
 .hero-sub {
-    font-family: 'Inter', sans-serif; font-size: 1.02rem; color: #9FBFC4;
+    font-family: 'Inter', sans-serif; font-size: 1rem; color: #A8AFC2;
     max-width: 640px; line-height: 1.5;
 }
-.wave-divider {
-    width: 100%; height: 34px; margin: 1.4rem 0 .4rem 0; opacity: .55;
+.accent-line {
+    width: 100%; height: 5px; margin: 1.2rem 0 1.6rem 0; border-radius: 999px;
+    background: linear-gradient(90deg, #EC4899 0%, #7C5CFC 45%, #3DDC84 100%);
 }
 
 /* Section headers */
 .section-eyebrow {
     font-family: 'Inter', sans-serif; font-weight: 700; letter-spacing: .1em;
-    text-transform: uppercase; font-size: .72rem; color: #35A7C4; margin-bottom: .15rem;
+    text-transform: uppercase; font-size: .72rem; color: #7C5CFC; margin-bottom: .15rem;
 }
 .section-title {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.6rem;
-    color: #F4F7F5; margin: 0 0 1rem 0;
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.55rem;
+    color: #FFFFFF; margin: 0 0 1rem 0;
+}
+
+/* Contexto de hoy */
+.contexto-banner {
+    background: #10152A; border: 1px solid rgba(124,92,252,0.35);
+    border-left: 4px solid #7C5CFC; border-radius: 10px;
+    padding: .9rem 1.1rem; margin: 0 0 1.4rem 0; font-size: .92rem; color: #D3D7E8;
 }
 
 /* Gauge card por cuenca */
 .gauge-card {
-    background: linear-gradient(160deg, #16424F 0%, #113440 100%);
-    border: 1px solid rgba(127, 212, 232, 0.12);
-    border-radius: 16px; padding: 1.1rem 1.2rem 1.3rem 1.2rem;
+    background: #10152A;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-top: 3px solid var(--gauge-accent, #7C5CFC);
+    border-radius: 14px; padding: 1.1rem 1.2rem 1.2rem 1.2rem;
     margin-bottom: .9rem;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
 }
-.gauge-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.35rem; }
-.gauge-name { font-family:'Fraunces', serif; font-weight:600; font-size:1.15rem; color:#F4F7F5; }
+.gauge-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.3rem; }
+.gauge-name { font-family:'Fraunces', serif; font-weight:600; font-size:1.1rem; color:#FFFFFF; }
 .gauge-badge {
-    font-family:'Inter', sans-serif; font-weight:700; font-size:.68rem; letter-spacing:.06em;
-    text-transform: uppercase; padding: .18rem .55rem; border-radius: 999px; color:#0B2E38;
+    font-family:'Inter', sans-serif; font-weight:700; font-size:.66rem; letter-spacing:.06em;
+    text-transform: uppercase; padding: .18rem .55rem; border-radius: 999px; color:#090D1A;
 }
-.gauge-station { font-size:.8rem; color:#8FB4BA; margin-bottom:.7rem; }
+.gauge-station { font-size:.78rem; color:#8890A6; margin-bottom:.7rem; }
 .gauge-track {
-    position: relative; width:100%; height:14px; border-radius:999px;
-    background: rgba(255,255,255,0.08); overflow: visible; margin-bottom: .35rem;
+    position: relative; width:100%; height:12px; border-radius:999px;
+    background: rgba(255,255,255,0.07); overflow: visible; margin-bottom: .3rem;
 }
-.gauge-fill { position:absolute; left:0; top:0; height:100%; border-radius:999px; transition: width .3s ease; }
+.gauge-fill { position:absolute; left:0; top:0; height:100%; border-radius:999px; }
 .gauge-tick {
-    position:absolute; top:-4px; width:2px; height:22px; background: rgba(244,247,245,0.5);
+    position:absolute; top:-3px; width:2px; height:18px; background: rgba(255,255,255,0.35);
 }
 .gauge-tick-label {
-    position:absolute; top:16px; font-size:.62rem; color:#8FB4BA; transform: translateX(-50%);
+    position:absolute; top:14px; font-size:.6rem; color:#7A8296; transform: translateX(-50%);
     white-space: nowrap;
 }
-.gauge-value { font-family:'Fraunces', serif; font-weight:700; font-size:1.4rem; color:#F4F7F5; margin-top:1.6rem; }
-.gauge-foot { font-size:.72rem; color:#7C9EA4; margin-top:.5rem; }
+.gauge-value { font-family:'Fraunces', serif; font-weight:700; font-size:1.35rem; color:#FFFFFF; margin-top:1.5rem; }
+.gauge-foot { font-size:.7rem; color:#6E7690; margin-top:.4rem; }
 
 /* Localidad chip list */
 .loc-chip {
     display:inline-flex; align-items:center; gap:.4rem;
-    background: rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
+    background: #10152A; border:1px solid rgba(255,255,255,0.08);
     border-radius: 999px; padding:.3rem .7rem; margin: .15rem .3rem .15rem 0;
-    font-size:.82rem; color:#E7F1F2;
+    font-size:.8rem; color:#D3D7E8;
 }
 .loc-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
 
-.footer-note { font-size:.78rem; color:#6E9297; text-align:center; padding: 1.4rem 0 .6rem 0; }
+.footer-note { font-size:.76rem; color:#565D75; text-align:center; padding: 1.4rem 0 .6rem 0; }
 
 hr { border-color: rgba(255,255,255,0.08) !important; }
 [data-testid="stExpander"] {
-    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+    background: #10152A; border: 1px solid rgba(255,255,255,0.08);
     border-radius: 12px;
 }
+[data-testid="stMetricValue"] { color: #FFFFFF; }
+[data-testid="stAlert"] { border-radius: 10px; }
 </style>
 """
 
 st.markdown(CSS, unsafe_allow_html=True)
 
+ACENTO_POR_INDICE = [ACENTO_ROSA, ACENTO_VIOLETA, ACENTO_VERDE, "#38BDF8"]
 
-def gauge_html(nombre: str, estacion: str, nivel: float, umbral_alerta: float,
-                umbral_evac: float, estado: str, fuente: str, conectado: bool,
-                actualizado: str) -> str:
+
+def gauge_html(nombre, estacion, nivel, umbral_alerta, umbral_evac, estado, fuente,
+                conectado, actualizado, acento) -> str:
     estilo = COLOR_ESTADO.get(estado, COLOR_ESTADO["NORMAL"])
     tope = max(umbral_evac * 1.18, nivel * 1.05)
     pct_nivel = min(nivel / tope * 100, 100)
@@ -143,7 +159,7 @@ def gauge_html(nombre: str, estacion: str, nivel: float, umbral_alerta: float,
     pct_evac = min(umbral_evac / tope * 100, 100)
     etiqueta_conexion = "✅ En vivo" if conectado else "⚠️ Dato de referencia"
     return f"""
-    <div class="gauge-card">
+    <div class="gauge-card" style="--gauge-accent:{acento}">
       <div class="gauge-top">
         <span class="gauge-name">{nombre}</span>
         <span class="gauge-badge" style="background:{estilo['hex']}">{estilo['label']}</span>
@@ -151,9 +167,9 @@ def gauge_html(nombre: str, estacion: str, nivel: float, umbral_alerta: float,
       <div class="gauge-station">{estacion}</div>
       <div class="gauge-track">
         <div class="gauge-fill" style="width:{pct_nivel:.1f}%; background:{estilo['hex']};"></div>
-        <div class="gauge-tick" style="left:{pct_alerta:.1f}%; background:#F5A623;"></div>
+        <div class="gauge-tick" style="left:{pct_alerta:.1f}%; background:#FFC93C;"></div>
         <div class="gauge-tick-label" style="left:{pct_alerta:.1f}%;">Alerta {umbral_alerta}m</div>
-        <div class="gauge-tick" style="left:{pct_evac:.1f}%; background:#E4543A;"></div>
+        <div class="gauge-tick" style="left:{pct_evac:.1f}%; background:#FF4D6D;"></div>
         <div class="gauge-tick-label" style="left:{pct_evac:.1f}%;">Evac. {umbral_evac}m</div>
       </div>
       <div class="gauge-value">{nivel} m</div>
@@ -162,21 +178,74 @@ def gauge_html(nombre: str, estacion: str, nivel: float, umbral_alerta: float,
     """
 
 
+# ---------------------------------------------------------------------
+# ANALISIS: interpretacion del valor + contexto estacional.
+# Orientativo, basado en patrones climaticos generales de la region —
+# no es un pronostico oficial ni reemplaza el reporte de INA o el SMN.
+# ---------------------------------------------------------------------
+def contexto_estacional(mes: int) -> str:
+    if mes in (12, 1, 2, 3):
+        return (
+            "Estamos en **verano** (dic-mar), la temporada de mayores lluvias en la "
+            "región. Es el período del año con más probabilidad de crecidas rápidas."
+        )
+    if mes in (4, 5, 6):
+        return (
+            "Estamos en **otoño** (abr-jun). Las lluvias empiezan a disminuir y los "
+            "niveles suelen ir estabilizándose o bajando respecto al verano."
+        )
+    if mes in (7, 8, 9):
+        return (
+            "Estamos en **invierno** (jul-sep), la temporada típicamente más seca del "
+            "año. Es habitual que los niveles estén en su punto más bajo (bajante)."
+        )
+    return (
+        "Estamos en **primavera** (oct-nov). La humedad y las lluvias empiezan a "
+        "aumentar de cara al verano, y los niveles suelen empezar a recuperarse."
+    )
+
+
+def interpretar_nivel_relativo(nivel, umbral_alerta, estado) -> str:
+    if estado == "EVACUACION":
+        return "El nivel ya superó el umbral de evacuación: es la situación más crítica de la escala."
+    if estado == "ALERTA":
+        return "El nivel ya superó el umbral de alerta, aunque todavía no llega al de evacuación."
+    ratio = nivel / umbral_alerta if umbral_alerta else 0
+    if ratio < 0.5:
+        return f"El nivel actual está muy por debajo del umbral de alerta (~{ratio*100:.0f}%) — típico de bajante."
+    if ratio < 0.8:
+        return f"El nivel está dentro de un rango considerado normal, en torno al {ratio*100:.0f}% del umbral de alerta."
+    return f"El nivel se está acercando al umbral de alerta (ya en el {ratio*100:.0f}%) — conviene monitorear con más frecuencia."
+
+
+def analizar(nombre, nivel, umbral_alerta, umbral_evacuacion, estado, fase_oni, mes) -> str:
+    interpretacion = interpretar_nivel_relativo(nivel, umbral_alerta, estado)
+    estacional = contexto_estacional(mes)
+    if fase_oni == "El Niño":
+        nota_oni = "Fase climática actual: **El Niño**, asociada históricamente a más lluvia de lo habitual en la región."
+    elif fase_oni == "La Niña":
+        nota_oni = "Fase climática actual: **La Niña**, asociada históricamente a menos lluvia de lo habitual en la región."
+    else:
+        nota_oni = "Fase climática actual: **Neutra**, sin señal fuerte de más o menos lluvia asociada a este factor."
+    return f"{interpretacion}\n\n{estacional}\n\n{nota_oni}"
+
+
 @st.cache_data(ttl=60)
 def cargar_datos():
-    """
-    Trae cuencas y localidades del backend. Si falla, devuelve None y
-    el dashboard lo va a decir con todas las letras -no va a mostrar
-    numeros inventados disfrazados de datos reales.
-    """
     try:
         r_cuencas = requests.get(f"{BACKEND_URL}/cuencas", timeout=8.0)
         r_localidades = requests.get(f"{BACKEND_URL}/localidades", timeout=8.0)
         r_cuencas.raise_for_status()
         r_localidades.raise_for_status()
-        return r_cuencas.json(), r_localidades.json()
+        fase_oni = "Neutro"
+        try:
+            r_clima = requests.get(f"{BACKEND_URL}/bot/consultar", timeout=5.0)
+            fase_oni = r_clima.json().get("clima", {}).get("fase_oni", "Neutro")
+        except Exception:
+            pass
+        return r_cuencas.json(), r_localidades.json(), fase_oni
     except Exception:
-        return None, None
+        return None, None, "Neutro"
 
 
 # ---------------------------------------------------------------------
@@ -187,76 +256,92 @@ st.markdown(
     <div class="hero-wrap">
         <span class="hero-eyebrow">HackLab + Hackathon 2026 · 2HC26</span>
         <h1 class="hero-title">Portal Hídrico Chaco</h1>
-        <p class="hero-sub">Monitoreo en vivo de las 4 cuencas principales y 12 localidades
-        de riesgo de la provincia, con la misma información que ves en el bot de Telegram
-        @cuencas_chaco_bot.</p>
+        <p class="hero-sub">Monitoreo de las 4 cuencas principales y 12 localidades
+        de riesgo de la provincia, con la misma información que ves en el bot de
+        Telegram @cuencas_chaco_bot.</p>
     </div>
-    <svg class="wave-divider" viewBox="0 0 1200 40" preserveAspectRatio="none">
-        <path d="M0,20 C150,40 350,0 600,20 C850,40 1050,0 1200,20 L1200,40 L0,40 Z" fill="#35A7C4"/>
-    </svg>
+    <div class="accent-line"></div>
     """,
     unsafe_allow_html=True,
 )
 
-datos_cuencas, datos_localidades = cargar_datos()
+datos_cuencas, datos_localidades, fase_oni_actual = cargar_datos()
 
 if datos_cuencas is None:
     st.error(
         "⚠️ No se pudo conectar con el backend en este momento. "
         "Si el servicio estaba dormido por inactividad (plan gratuito de Render), "
-        "puede tardar hasta 50 segundos en despertar. Volve a cargar la pagina en un momento."
+        "puede tardar hasta 50 segundos en despertar. Volvé a cargar la página en un momento."
     )
     st.stop()
 
 cuencas = datos_cuencas["cuencas"]
 explicaciones = datos_cuencas["explicaciones"]
 localidades = datos_localidades["localidades"]
+mes_actual = datetime.now().month
 
 # ---------------------------------------------------------------------
-# TRANSPARENCIA SOBRE LOS DATOS
+# TRANSPARENCIA SOBRE LOS DATOS + CONTEXTO DE HOY
 # ---------------------------------------------------------------------
 con_conexion = sum(1 for c in cuencas.values() if c["conectado"])
 if con_conexion == 0:
     st.info(
         "ℹ️ **Sobre estos datos:** todos los valores que ves abajo son datos de "
         "*referencia* (semilla), cargados manualmente para poder demostrar el "
-        "sistema mientras se integra una fuente en vivo. Ninguno esta conectado "
-        "todavia a una fuente automatica en tiempo real — cada tarjeta lo indica."
+        "sistema mientras se integra una fuente en vivo. Ninguno está conectado "
+        "todavía a una fuente automática en tiempo real — cada tarjeta lo indica."
     )
+
+st.markdown(
+    f'<div class="contexto-banner">🗓️ <b>Contexto de hoy:</b> {contexto_estacional(mes_actual)}</div>',
+    unsafe_allow_html=True,
+)
 
 col_a, col_b = st.columns(2)
 with col_a:
-    with st.expander("📖 ¿Que significa cada dato? (para quien no es tecnico)"):
+    with st.expander("📖 ¿Qué significa cada dato? (para quien no es técnico)"):
         for clave, texto in explicaciones.items():
             st.markdown(f"**{clave.replace('_', ' ').capitalize()}:** {texto}")
-    with st.expander("🚨 ¿Que hacer segun el estado? (protocolo general)"):
+    with st.expander("🚨 ¿Qué hacer según el estado? (protocolo general)"):
         st.markdown(
             """
-Guia **general y orientativa**, no un protocolo oficial. Ante cualquier
-alerta real, la indicacion valida es siempre la que emita **Defensa Civil
+Guía **general y orientativa**, no un protocolo oficial. Ante cualquier
+alerta real, la indicación válida es siempre la que emita **Defensa Civil
 de tu localidad**.
 
-- 🟢 **NORMAL:** monitoreo pasivo, sin accion especial.
-- 🟡 **ALERTA:** revisa lo esencial (documentos, medicamentos, ropa) y
+- 🟢 **NORMAL:** monitoreo pasivo, sin acción especial.
+- 🟡 **ALERTA:** revisá lo esencial (documentos, medicamentos, ropa) y
   estate atento a los canales oficiales.
-- 🔴 **EVACUACION:** segui estrictamente las indicaciones de Defensa Civil
+- 🔴 **EVACUACIÓN:** seguí estrictamente las indicaciones de Defensa Civil
   y autoridades locales.
 """
         )
 with col_b:
-    with st.expander("🌎 Contexto: ¿en que se basa este sistema de alerta?"):
+    with st.expander("🌎 Contexto: ¿en qué se basa este sistema de alerta?"):
         st.markdown(
             """
-Este portal usa la misma logica de **3 niveles** (normal, alerta, evacuacion)
-que emplea el **Sistema de Informacion y Alerta Hidrologico (SIyAH)** del
+Este portal usa la misma lógica de **3 niveles** (normal, alerta, evacuación)
+que emplea el **Sistema de Información y Alerta Hidrológico (SIyAH)** del
 Instituto Nacional del Agua (INA), que desde 1983 monitorea la Cuenca del
-Plata en cinco paises y emite pronosticos usados por Defensa Civil en toda
-la region.
+Plata en cinco países y emite pronósticos usados por Defensa Civil en toda
+la región.
 
-Es una **herramienta complementaria y de demostracion** -no reemplaza el
+Es una **herramienta complementaria y de demostración** — no reemplaza el
 reporte oficial de INA, consultable en alerta.ina.gob.ar.
 
 **Fuente:** Instituto Nacional del Agua (INA).
+"""
+        )
+    with st.expander("📊 Nota metodológica sobre el análisis"):
+        st.markdown(
+            """
+Las secciones de "Análisis y contexto" de cada cuenca combinan:
+1. Qué tan cerca está el nivel actual del umbral de alerta (en %).
+2. La época del año (estación húmeda/seca típica de la región).
+3. La fase climática ONI vigente (El Niño / La Niña / Neutro).
+
+Es una lectura **orientativa basada en patrones históricos generales**,
+no un pronóstico oficial.
 """
         )
 
@@ -271,16 +356,23 @@ st.markdown(
     unsafe_allow_html=True,
 )
 cols = st.columns(4)
-for col, (clave, c) in zip(cols, cuencas.items()):
+for i, (col, (clave, c)) in enumerate(zip(cols, cuencas.items())):
     with col:
         st.markdown(
             gauge_html(
                 c["nombre"], c["estacion"], c["nivel_metros"], c["umbral_alerta"],
                 c["umbral_evacuacion"], c["estado"], c["fuente"], c["conectado"],
-                c["ultima_verificacion"],
+                c["ultima_verificacion"], ACENTO_POR_INDICE[i % len(ACENTO_POR_INDICE)],
             ),
             unsafe_allow_html=True,
         )
+        with st.expander("📊 Análisis y contexto"):
+            st.markdown(
+                analizar(
+                    c["nombre"], c["nivel_metros"], c["umbral_alerta"], c["umbral_evacuacion"],
+                    c["estado"], fase_oni_actual, mes_actual,
+                )
+            )
 
 st.markdown("---")
 
@@ -300,7 +392,7 @@ for clave, loc in localidades.items():
         continue
     lat, lon = COORDENADAS[clave]
     estilo = COLOR_ESTADO.get(loc["estado"], COLOR_ESTADO["NORMAL"])
-    etiqueta_conexion = "En vivo" if loc["conectado"] else "Dato de referencia, sin conexion automatica aun"
+    etiqueta_conexion = "En vivo" if loc["conectado"] else "Dato de referencia, sin conexión automática aún"
     popup_html = (
         f"<b>{loc['nombre']}</b><br>"
         f"Nivel: {loc['nivel_metros']} m<br>"
@@ -340,15 +432,22 @@ for clave, loc in localidades.items():
         with c1:
             st.write(f"**Nivel actual:** {loc['nivel_metros']} m")
             st.write(f"**Umbral de alerta:** {loc['umbral_alerta']} m")
-            st.write(f"**Umbral de evacuacion:** {loc['umbral_evacuacion']} m")
+            st.write(f"**Umbral de evacuación:** {loc['umbral_evacuacion']} m")
         with c2:
             st.write(f"**Fuente:** {loc['fuente']}")
-            st.write(f"**Ultima verificacion:** {loc['ultima_verificacion']}")
-            st.write(f"**Conectado en vivo:** {'Si' if loc['conectado'] else 'No'}")
+            st.write(f"**Última verificación:** {loc['ultima_verificacion']}")
+            st.write(f"**Conectado en vivo:** {'Sí' if loc['conectado'] else 'No'}")
+        st.markdown("**📊 Análisis:**")
+        st.markdown(
+            analizar(
+                loc["nombre"], loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"],
+                loc["estado"], fase_oni_actual, mes_actual,
+            )
+        )
 
 st.markdown(
     '<div class="footer-note">Este portal y el bot de Telegram @cuencas_chaco_bot '
-    'comparten el mismo backend, para que la informacion sea siempre consistente '
+    'comparten el mismo backend, para que la información sea siempre consistente '
     'entre ambas herramientas.</div>',
     unsafe_allow_html=True,
 )
