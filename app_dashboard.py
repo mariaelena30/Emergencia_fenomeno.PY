@@ -33,10 +33,6 @@ COORDENADAS = {
     "fuerte_esperanza": (-24.5333, -61.7500),
 }
 
-# ---------------------------------------------------------------------
-# TOKENS VISUALES — paleta propia: marino casi negro + acentos vivos
-# rosa/violeta/verde, minimalista y de buen contraste.
-# ---------------------------------------------------------------------
 COLOR_ESTADO = {
     "NORMAL": {"hex": "#2ED573", "folium": "green", "label": "Normal"},
     "ALERTA": {"hex": "#FFC93C", "folium": "orange", "label": "Alerta"},
@@ -57,7 +53,6 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     color: #F5F6FA;
 }
 
-/* Hero */
 .hero-wrap { padding: 1.6rem 0 .8rem 0; }
 .hero-eyebrow {
     font-family: 'Inter', sans-serif; font-weight: 700; letter-spacing: .16em;
@@ -77,7 +72,6 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     background: linear-gradient(90deg, #EC4899 0%, #7C5CFC 45%, #3DDC84 100%);
 }
 
-/* Section headers */
 .section-eyebrow {
     font-family: 'Inter', sans-serif; font-weight: 700; letter-spacing: .1em;
     text-transform: uppercase; font-size: .72rem; color: #7C5CFC; margin-bottom: .15rem;
@@ -87,14 +81,12 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     color: #FFFFFF; margin: 0 0 1rem 0;
 }
 
-/* Contexto de hoy */
 .contexto-banner {
     background: #10152A; border: 1px solid rgba(124,92,252,0.35);
     border-left: 4px solid #7C5CFC; border-radius: 10px;
     padding: .9rem 1.1rem; margin: 0 0 1.4rem 0; font-size: .92rem; color: #D3D7E8;
 }
 
-/* Gauge card por cuenca */
 .gauge-card {
     background: #10152A;
     border: 1px solid rgba(255,255,255,0.06);
@@ -124,7 +116,6 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
 .gauge-value { font-family:'Fraunces', serif; font-weight:700; font-size:1.35rem; color:#FFFFFF; margin-top:1.5rem; }
 .gauge-foot { font-size:.7rem; color:#6E7690; margin-top:.4rem; }
 
-/* Localidad chip list */
 .loc-chip {
     display:inline-flex; align-items:center; gap:.4rem;
     background: #10152A; border:1px solid rgba(255,255,255,0.08);
@@ -178,11 +169,6 @@ def gauge_html(nombre, estacion, nivel, umbral_alerta, umbral_evac, estado, fuen
     """
 
 
-# ---------------------------------------------------------------------
-# ANALISIS: interpretacion del valor + contexto estacional.
-# Orientativo, basado en patrones climaticos generales de la region —
-# no es un pronostico oficial ni reemplaza el reporte de INA o el SMN.
-# ---------------------------------------------------------------------
 def contexto_estacional(mes: int) -> str:
     if mes in (12, 1, 2, 3):
         return (
@@ -218,7 +204,22 @@ def interpretar_nivel_relativo(nivel, umbral_alerta, estado) -> str:
     return f"El nivel se está acercando al umbral de alerta (ya en el {ratio*100:.0f}%) — conviene monitorear con más frecuencia."
 
 
-def analizar(nombre, nivel, umbral_alerta, umbral_evacuacion, estado, fase_oni, mes) -> str:
+def interpretar_precipitacion(precip_mm) -> str:
+    """Lectura orientativa de la lluvia acumulada reciente, en lenguaje simple."""
+    if precip_mm is None:
+        return ""
+    if precip_mm < 10:
+        nivel_txt = "baja"
+    elif precip_mm < 30:
+        nivel_txt = "moderada"
+    elif precip_mm < 60:
+        nivel_txt = "alta"
+    else:
+        nivel_txt = "muy alta"
+    return f"Precipitación acumulada reciente: **{precip_mm:.0f} mm** (acumulación {nivel_txt})."
+
+
+def analizar(nombre, nivel, umbral_alerta, umbral_evacuacion, estado, fase_oni, mes, precip_mm=None) -> str:
     interpretacion = interpretar_nivel_relativo(nivel, umbral_alerta, estado)
     estacional = contexto_estacional(mes)
     if fase_oni == "El Niño":
@@ -227,7 +228,11 @@ def analizar(nombre, nivel, umbral_alerta, umbral_evacuacion, estado, fase_oni, 
         nota_oni = "Fase climática actual: **La Niña**, asociada históricamente a menos lluvia de lo habitual en la región."
     else:
         nota_oni = "Fase climática actual: **Neutra**, sin señal fuerte de más o menos lluvia asociada a este factor."
-    return f"{interpretacion}\n\n{estacional}\n\n{nota_oni}"
+    partes = [interpretacion, estacional, nota_oni]
+    nota_precip = interpretar_precipitacion(precip_mm)
+    if nota_precip:
+        partes.append(nota_precip)
+    return "\n\n".join(partes)
 
 
 @st.cache_data(ttl=60)
@@ -248,9 +253,6 @@ def cargar_datos():
         return None, None, "Neutro"
 
 
-# ---------------------------------------------------------------------
-# HERO
-# ---------------------------------------------------------------------
 st.markdown(
     """
     <div class="hero-wrap">
@@ -280,9 +282,6 @@ explicaciones = datos_cuencas["explicaciones"]
 localidades = datos_localidades["localidades"]
 mes_actual = datetime.now().month
 
-# ---------------------------------------------------------------------
-# TRANSPARENCIA SOBRE LOS DATOS + CONTEXTO DE HOY
-# ---------------------------------------------------------------------
 con_conexion = sum(1 for c in cuencas.values() if c["conectado"])
 if con_conexion == 0:
     st.info(
@@ -339,6 +338,7 @@ Las secciones de "Análisis y contexto" de cada cuenca combinan:
 1. Qué tan cerca está el nivel actual del umbral de alerta (en %).
 2. La época del año (estación húmeda/seca típica de la región).
 3. La fase climática ONI vigente (El Niño / La Niña / Neutro).
+4. La precipitación acumulada reciente en la localidad, cuando está disponible.
 
 Es una lectura **orientativa basada en patrones históricos generales**,
 no un pronóstico oficial.
@@ -347,9 +347,6 @@ no un pronóstico oficial.
 
 st.markdown("---")
 
-# ---------------------------------------------------------------------
-# GAUGES DE LAS 4 CUENCAS
-# ---------------------------------------------------------------------
 st.markdown(
     '<div class="section-eyebrow">Panorama general</div>'
     '<div class="section-title">🌊 Estado de las 4 cuencas</div>',
@@ -376,9 +373,6 @@ for i, (col, (clave, c)) in enumerate(zip(cols, cuencas.items())):
 
 st.markdown("---")
 
-# ---------------------------------------------------------------------
-# MAPA
-# ---------------------------------------------------------------------
 st.markdown(
     '<div class="section-eyebrow">Vista territorial</div>'
     '<div class="section-title">🗺 Mapa de localidades monitoreadas</div>',
@@ -393,10 +387,13 @@ for clave, loc in localidades.items():
     lat, lon = COORDENADAS[clave]
     estilo = COLOR_ESTADO.get(loc["estado"], COLOR_ESTADO["NORMAL"])
     etiqueta_conexion = "En vivo" if loc["conectado"] else "Dato de referencia, sin conexión automática aún"
+    precip = loc.get("precipitacion_acumulada_mm")
+    linea_precip = f"Precipitación acumulada: {precip:.0f} mm<br>" if precip is not None else ""
     popup_html = (
         f"<b>{loc['nombre']}</b><br>"
         f"Nivel: {loc['nivel_metros']} m<br>"
         f"Estado: {loc['estado']}<br>"
+        f"{linea_precip}"
         f"Fuente: {loc['fuente']}<br>"
         f"<i>{etiqueta_conexion}</i>"
     )
@@ -415,9 +412,6 @@ chips = "".join(
 )
 st.markdown(chips, unsafe_allow_html=True)
 
-# ---------------------------------------------------------------------
-# DETALLE POR LOCALIDAD
-# ---------------------------------------------------------------------
 st.markdown("---")
 st.markdown(
     '<div class="section-eyebrow">Detalle</div>'
@@ -428,20 +422,23 @@ st.markdown(
 for clave, loc in localidades.items():
     aviso = "" if loc["conectado"] else " · ⚠️ dato de referencia"
     with st.expander(f"{loc['emoji']} {loc['nombre']} — {loc['estado']}{aviso}"):
-        c1, c2 = st.columns(2)
+        c1, c2, c3 = st.columns(3)
         with c1:
             st.write(f"**Nivel actual:** {loc['nivel_metros']} m")
             st.write(f"**Umbral de alerta:** {loc['umbral_alerta']} m")
             st.write(f"**Umbral de evacuación:** {loc['umbral_evacuacion']} m")
         with c2:
+            precip = loc.get("precipitacion_acumulada_mm")
+            st.write(f"**Precipitación acumulada:** {precip:.0f} mm" if precip is not None else "**Precipitación acumulada:** sin dato")
             st.write(f"**Fuente:** {loc['fuente']}")
             st.write(f"**Última verificación:** {loc['ultima_verificacion']}")
+        with c3:
             st.write(f"**Conectado en vivo:** {'Sí' if loc['conectado'] else 'No'}")
         st.markdown("**📊 Análisis:**")
         st.markdown(
             analizar(
                 loc["nombre"], loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"],
-                loc["estado"], fase_oni_actual, mes_actual,
+                loc["estado"], fase_oni_actual, mes_actual, loc.get("precipitacion_acumulada_mm"),
             )
         )
 
