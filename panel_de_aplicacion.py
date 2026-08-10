@@ -33,6 +33,9 @@ COORDENADAS = {
     "fuerte_esperanza": (-24.5333, -61.7500),
 }
 
+# ---------------------------------------------------------------------
+# TOKENS VISUALES
+# ---------------------------------------------------------------------
 COLOR_ESTADO = {
     "NORMAL": {"hex": "#2ED573", "folium": "green", "label": "Normal"},
     "ALERTA": {"hex": "#FFC93C", "folium": "orange", "label": "Alerta"},
@@ -41,10 +44,11 @@ COLOR_ESTADO = {
 ACENTO_ROSA = "#EC4899"
 ACENTO_VIOLETA = "#7C5CFC"
 ACENTO_VERDE = "#3DDC84"
+ACENTO_CELESTE = "#38BDF8"
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
 
 html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
 
@@ -53,69 +57,120 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     color: #F5F6FA;
 }
 
-.hero-wrap { padding: 1.6rem 0 .8rem 0; }
+/* ---------- Hero ---------- */
+.hero-wrap { padding: 1.8rem 0 .9rem 0; }
 .hero-eyebrow {
-    font-family: 'Inter', sans-serif; font-weight: 700; letter-spacing: .16em;
-    text-transform: uppercase; font-size: .72rem; color: #FF4FA3;
-    margin-bottom: .6rem; display:block;
+    font-family: 'JetBrains Mono', monospace; font-weight: 600; letter-spacing: .14em;
+    text-transform: uppercase; font-size: .72rem; color: #7C5CFC;
+    margin-bottom: .7rem; display:flex; align-items:center; gap:.5rem;
+}
+.hero-eyebrow .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #3DDC84;
+    box-shadow: 0 0 0 3px rgba(61,220,132,0.18);
+    display:inline-block;
 }
 .hero-title {
-    font-family: 'Fraunces', serif; font-weight: 700; font-size: 2.9rem;
-    line-height: 1.05; color: #FFFFFF; margin: 0 0 .5rem 0;
+    font-family: 'Fraunces', serif; font-weight: 700; font-size: 2.85rem;
+    line-height: 1.05; color: #FFFFFF; margin: 0 0 .55rem 0;
 }
 .hero-sub {
     font-family: 'Inter', sans-serif; font-size: 1rem; color: #A8AFC2;
-    max-width: 640px; line-height: 1.5;
+    max-width: 660px; line-height: 1.55;
 }
 .accent-line {
-    width: 100%; height: 5px; margin: 1.2rem 0 1.6rem 0; border-radius: 999px;
+    width: 100%; height: 4px; margin: 1.3rem 0 1.7rem 0; border-radius: 999px;
     background: linear-gradient(90deg, #EC4899 0%, #7C5CFC 45%, #3DDC84 100%);
 }
 
+/* ---------- Section headers ---------- */
 .section-eyebrow {
-    font-family: 'Inter', sans-serif; font-weight: 700; letter-spacing: .1em;
-    text-transform: uppercase; font-size: .72rem; color: #7C5CFC; margin-bottom: .15rem;
+    font-family: 'JetBrains Mono', monospace; font-weight: 600; letter-spacing: .1em;
+    text-transform: uppercase; font-size: .7rem; color: #7C5CFC; margin-bottom: .2rem;
 }
 .section-title {
     font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.55rem;
-    color: #FFFFFF; margin: 0 0 1rem 0;
+    color: #FFFFFF; margin: 0 0 1.1rem 0;
 }
 
+/* ---------- Contexto de hoy ---------- */
 .contexto-banner {
     background: #10152A; border: 1px solid rgba(124,92,252,0.35);
     border-left: 4px solid #7C5CFC; border-radius: 10px;
     padding: .9rem 1.1rem; margin: 0 0 1.4rem 0; font-size: .92rem; color: #D3D7E8;
 }
 
+/* ---------- Gauge card (resumen de cuenca) ---------- */
 .gauge-card {
     background: #10152A;
     border: 1px solid rgba(255,255,255,0.06);
     border-top: 3px solid var(--gauge-accent, #7C5CFC);
-    border-radius: 14px; padding: 1.1rem 1.2rem 1.2rem 1.2rem;
+    border-radius: 14px; padding: 1.15rem 1.25rem 1.3rem 1.25rem;
     margin-bottom: .9rem;
 }
 .gauge-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.3rem; }
 .gauge-name { font-family:'Fraunces', serif; font-weight:600; font-size:1.1rem; color:#FFFFFF; }
 .gauge-badge {
-    font-family:'Inter', sans-serif; font-weight:700; font-size:.66rem; letter-spacing:.06em;
-    text-transform: uppercase; padding: .18rem .55rem; border-radius: 999px; color:#090D1A;
+    font-family:'Inter', sans-serif; font-weight:700; font-size:.64rem; letter-spacing:.06em;
+    text-transform: uppercase; padding: .2rem .6rem; border-radius: 999px; color:#090D1A;
 }
-.gauge-station { font-size:.78rem; color:#8890A6; margin-bottom:.7rem; }
-.gauge-track {
-    position: relative; width:100%; height:12px; border-radius:999px;
-    background: rgba(255,255,255,0.07); overflow: visible; margin-bottom: .3rem;
+.gauge-station { font-size:.78rem; color:#8890A6; margin-bottom:1rem; }
+.gauge-value-row { display:flex; align-items:baseline; gap:.4rem; margin-bottom:.55rem; }
+.gauge-value { font-family:'Fraunces', serif; font-weight:700; font-size:1.75rem; color:#FFFFFF; }
+.gauge-value-unit { font-size:.85rem; color:#7A8296; }
+.gauge-foot { font-size:.7rem; color:#6E7690; margin-top:.7rem; }
+
+/* ---------- Barra de umbrales (el elemento visual central) ----------
+   Separa claramente TRES cosas: la zona normal, la zona de alerta y la
+   zona de evacuacion, y marca con un pin donde esta el nivel actual. */
+.umbral-wrap { margin: .3rem 0 .2rem 0; }
+.umbral-barra {
+    position: relative; width: 100%; height: 10px; border-radius: 999px;
+    display: flex; overflow: visible; margin-bottom: 1.6rem;
 }
-.gauge-fill { position:absolute; left:0; top:0; height:100%; border-radius:999px; }
-.gauge-tick {
-    position:absolute; top:-3px; width:2px; height:18px; background: rgba(255,255,255,0.35);
+.umbral-zona { height: 100%; }
+.umbral-zona.normal { background: linear-gradient(90deg, #1a4d33, #2ED573); border-radius: 999px 0 0 999px; }
+.umbral-zona.alerta { background: #FFC93C; }
+.umbral-zona.evacuacion { background: linear-gradient(90deg, #FF4D6D, #c92c47); border-radius: 0 999px 999px 0; }
+.umbral-pin {
+    position: absolute; top: -9px; width: 3px; height: 28px;
+    background: #FFFFFF; border-radius: 2px;
+    box-shadow: 0 0 0 2px #090D1A, 0 0 8px rgba(255,255,255,0.5);
 }
-.gauge-tick-label {
-    position:absolute; top:14px; font-size:.6rem; color:#7A8296; transform: translateX(-50%);
+.umbral-pin-label {
+    position: absolute; top: -30px; transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: .68rem;
+    color: #FFFFFF; background: rgba(0,0,0,0.55); padding: .12rem .4rem; border-radius: 5px;
     white-space: nowrap;
 }
-.gauge-value { font-family:'Fraunces', serif; font-weight:700; font-size:1.35rem; color:#FFFFFF; margin-top:1.5rem; }
-.gauge-foot { font-size:.7rem; color:#6E7690; margin-top:.4rem; }
+.umbral-marca {
+    position: absolute; top: 14px; transform: translateX(-50%);
+    font-size: .62rem; color: #7A8296; white-space: nowrap; text-align: center;
+}
+.umbral-marca .valor { color: #A8AFC2; font-weight: 600; }
 
+/* ---------- Chips de metadata (fuente, precipitacion, etc) ---------- */
+.meta-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: .6rem; margin: 1rem 0 1.1rem 0;
+}
+.meta-chip {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px; padding: .65rem .8rem;
+}
+.meta-chip-label {
+    font-family: 'JetBrains Mono', monospace; font-size: .62rem; letter-spacing: .05em;
+    text-transform: uppercase; color: #7A8296; margin-bottom: .25rem;
+}
+.meta-chip-value { font-size: .86rem; color: #F5F6FA; font-weight: 500; line-height: 1.35; }
+
+/* ---------- Bloque de analisis ---------- */
+.analisis-label {
+    font-family: 'JetBrains Mono', monospace; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; font-size: .68rem; color: #3DDC84;
+    margin: 1.1rem 0 .5rem 0; display:flex; align-items:center; gap:.4rem;
+}
+
+/* ---------- Localidad chip list (mapa) ---------- */
 .loc-chip {
     display:inline-flex; align-items:center; gap:.4rem;
     background: #10152A; border:1px solid rgba(255,255,255,0.08);
@@ -131,6 +186,9 @@ hr { border-color: rgba(255,255,255,0.08) !important; }
     background: #10152A; border: 1px solid rgba(255,255,255,0.08);
     border-radius: 12px;
 }
+[data-testid="stExpander"] summary {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.02rem;
+}
 [data-testid="stMetricValue"] { color: #FFFFFF; }
 [data-testid="stAlert"] { border-radius: 10px; }
 </style>
@@ -138,17 +196,86 @@ hr { border-color: rgba(255,255,255,0.08) !important; }
 
 st.markdown(CSS, unsafe_allow_html=True)
 
-ACENTO_POR_INDICE = [ACENTO_ROSA, ACENTO_VIOLETA, ACENTO_VERDE, "#38BDF8"]
+# ---------------------------------------------------------------------
+# PWA: conecta el manifest.json e iconos para que "Agregar a pantalla
+# de inicio" desde el celular use el icono propio y abra en pantalla
+# completa. Streamlit no permite tocar el <head> directamente, asi que
+# se inyecta con un poco de JS apuntando al documento padre.
+# Requiere: carpeta static/ (manifest.json, icon-192.png, icon-512.png)
+# y .streamlit/config.toml con enableStaticServing = true.
+# ---------------------------------------------------------------------
+import streamlit.components.v1 as components
+
+components.html(
+    """
+    <script>
+    (function() {
+        const head = window.parent.document.head;
+        if (head.querySelector('link[rel="manifest"]')) return;  // no duplicar
+
+        const manifest = document.createElement('link');
+        manifest.rel = 'manifest';
+        manifest.href = './static/manifest.json';
+        head.appendChild(manifest);
+
+        const icono = document.createElement('link');
+        icono.rel = 'apple-touch-icon';
+        icono.href = './static/icon-192.png';
+        head.appendChild(icono);
+
+        const temaColor = document.createElement('meta');
+        temaColor.name = 'theme-color';
+        temaColor.content = '#090D1A';
+        head.appendChild(temaColor);
+
+        const appleCapable = document.createElement('meta');
+        appleCapable.name = 'apple-mobile-web-app-capable';
+        appleCapable.content = 'yes';
+        head.appendChild(appleCapable);
+    })();
+    </script>
+    """,
+    height=0,
+    width=0,
+)
+
+ACENTO_POR_INDICE = [ACENTO_ROSA, ACENTO_VIOLETA, ACENTO_VERDE, ACENTO_CELESTE]
+
+
+# ---------------------------------------------------------------------
+# BARRA DE UMBRALES: el elemento visual que separa nivel actual de
+# los umbrales de alerta/evacuacion. Se usa tanto en el resumen de
+# cuencas como en el detalle de cada localidad.
+# ---------------------------------------------------------------------
+def barra_umbral_html(nivel, umbral_alerta, umbral_evacuacion) -> str:
+    tope = max(umbral_evacuacion * 1.15, nivel * 1.05)
+    pct_alerta = min(umbral_alerta / tope * 100, 100)
+    pct_evac = min(umbral_evacuacion / tope * 100, 100)
+    pct_nivel = min(nivel / tope * 100, 100)
+
+    ancho_normal = pct_alerta
+    ancho_alerta = pct_evac - pct_alerta
+    ancho_evac = 100 - pct_evac
+
+    return f"""
+    <div class="umbral-wrap">
+      <div class="umbral-barra">
+        <div class="umbral-zona normal" style="width:{ancho_normal:.1f}%"></div>
+        <div class="umbral-zona alerta" style="width:{ancho_alerta:.1f}%"></div>
+        <div class="umbral-zona evacuacion" style="width:{ancho_evac:.1f}%"></div>
+        <div class="umbral-pin" style="left:{pct_nivel:.1f}%"></div>
+        <div class="umbral-pin-label" style="left:{pct_nivel:.1f}%">{nivel} m</div>
+        <div class="umbral-marca" style="left:{pct_alerta:.1f}%">Alerta<br/><span class="valor">{umbral_alerta} m</span></div>
+        <div class="umbral-marca" style="left:{pct_evac:.1f}%">Evacuación<br/><span class="valor">{umbral_evacuacion} m</span></div>
+      </div>
+    </div>
+    """
 
 
 def gauge_html(nombre, estacion, nivel, umbral_alerta, umbral_evac, estado, fuente,
                 conectado, actualizado, acento) -> str:
     estilo = COLOR_ESTADO.get(estado, COLOR_ESTADO["NORMAL"])
-    tope = max(umbral_evac * 1.18, nivel * 1.05)
-    pct_nivel = min(nivel / tope * 100, 100)
-    pct_alerta = min(umbral_alerta / tope * 100, 100)
-    pct_evac = min(umbral_evac / tope * 100, 100)
-    etiqueta_conexion = "✅ En vivo" if conectado else "⚠️ Dato de referencia"
+    etiqueta_conexion = "✅ En vivo" if conectado else "⚠️ Referencia"
     return f"""
     <div class="gauge-card" style="--gauge-accent:{acento}">
       <div class="gauge-top">
@@ -156,14 +283,11 @@ def gauge_html(nombre, estacion, nivel, umbral_alerta, umbral_evac, estado, fuen
         <span class="gauge-badge" style="background:{estilo['hex']}">{estilo['label']}</span>
       </div>
       <div class="gauge-station">{estacion}</div>
-      <div class="gauge-track">
-        <div class="gauge-fill" style="width:{pct_nivel:.1f}%; background:{estilo['hex']};"></div>
-        <div class="gauge-tick" style="left:{pct_alerta:.1f}%; background:#FFC93C;"></div>
-        <div class="gauge-tick-label" style="left:{pct_alerta:.1f}%;">Alerta {umbral_alerta}m</div>
-        <div class="gauge-tick" style="left:{pct_evac:.1f}%; background:#FF4D6D;"></div>
-        <div class="gauge-tick-label" style="left:{pct_evac:.1f}%;">Evac. {umbral_evac}m</div>
+      <div class="gauge-value-row">
+        <span class="gauge-value">{nivel}</span>
+        <span class="gauge-value-unit">metros — nivel actual</span>
       </div>
-      <div class="gauge-value">{nivel} m</div>
+      {barra_umbral_html(nivel, umbral_alerta, umbral_evac)}
       <div class="gauge-foot">{etiqueta_conexion} · {fuente}<br/>Actualizado: {actualizado}</div>
     </div>
     """
@@ -205,7 +329,6 @@ def interpretar_nivel_relativo(nivel, umbral_alerta, estado) -> str:
 
 
 def interpretar_precipitacion(precip_mm) -> str:
-    """Lectura orientativa de la lluvia acumulada reciente, en lenguaje simple."""
     if precip_mm is None:
         return ""
     if precip_mm < 10:
@@ -253,14 +376,17 @@ def cargar_datos():
         return None, None, "Neutro"
 
 
+# ---------------------------------------------------------------------
+# HERO
+# ---------------------------------------------------------------------
 st.markdown(
     """
     <div class="hero-wrap">
-        <span class="hero-eyebrow">HackLab + Hackathon 2026 · 2HC26</span>
+        <span class="hero-eyebrow"><span class="dot"></span>Monitoreo hidrológico en tiempo real</span>
         <h1 class="hero-title">Portal Hídrico Chaco</h1>
-        <p class="hero-sub">Monitoreo de las 4 cuencas principales y 12 localidades
-        de riesgo de la provincia, con la misma información que ves en el bot de
-        Telegram @cuencas_chaco_bot.</p>
+        <p class="hero-sub">Estado de las 4 cuencas principales y 12 localidades de riesgo
+        de la provincia, con la misma información que ves en el bot de Telegram
+        @cuencas_chaco_bot.</p>
     </div>
     <div class="accent-line"></div>
     """,
@@ -347,6 +473,9 @@ no un pronóstico oficial.
 
 st.markdown("---")
 
+# ---------------------------------------------------------------------
+# GAUGES DE LAS 4 CUENCAS
+# ---------------------------------------------------------------------
 st.markdown(
     '<div class="section-eyebrow">Panorama general</div>'
     '<div class="section-title">🌊 Estado de las 4 cuencas</div>',
@@ -373,6 +502,9 @@ for i, (col, (clave, c)) in enumerate(zip(cols, cuencas.items())):
 
 st.markdown("---")
 
+# ---------------------------------------------------------------------
+# MAPA
+# ---------------------------------------------------------------------
 st.markdown(
     '<div class="section-eyebrow">Vista territorial</div>'
     '<div class="section-title">🗺 Mapa de localidades monitoreadas</div>',
@@ -412,6 +544,9 @@ chips = "".join(
 )
 st.markdown(chips, unsafe_allow_html=True)
 
+# ---------------------------------------------------------------------
+# DETALLE POR LOCALIDAD
+# ---------------------------------------------------------------------
 st.markdown("---")
 st.markdown(
     '<div class="section-eyebrow">Detalle</div>'
@@ -422,19 +557,52 @@ st.markdown(
 for clave, loc in localidades.items():
     aviso = "" if loc["conectado"] else " · ⚠️ dato de referencia"
     with st.expander(f"{loc['emoji']} {loc['nombre']} — {loc['estado']}{aviso}"):
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.write(f"**Nivel actual:** {loc['nivel_metros']} m")
-            st.write(f"**Umbral de alerta:** {loc['umbral_alerta']} m")
-            st.write(f"**Umbral de evacuación:** {loc['umbral_evacuacion']} m")
-        with c2:
-            precip = loc.get("precipitacion_acumulada_mm")
-            st.write(f"**Precipitación acumulada:** {precip:.0f} mm" if precip is not None else "**Precipitación acumulada:** sin dato")
-            st.write(f"**Fuente:** {loc['fuente']}")
-            st.write(f"**Última verificación:** {loc['ultima_verificacion']}")
-        with c3:
-            st.write(f"**Conectado en vivo:** {'Sí' if loc['conectado'] else 'No'}")
-        st.markdown("**📊 Análisis:**")
+        estilo = COLOR_ESTADO.get(loc["estado"], COLOR_ESTADO["NORMAL"])
+        precip = loc.get("precipitacion_acumulada_mm")
+
+        # Valor grande del nivel actual + badge de estado
+        st.markdown(
+            f"""
+            <div class="gauge-value-row" style="margin-top:.2rem;">
+              <span class="gauge-value">{loc['nivel_metros']}</span>
+              <span class="gauge-value-unit">metros — nivel actual</span>
+              <span class="gauge-badge" style="background:{estilo['hex']}; margin-left:.6rem;">{estilo['label']}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Barra visual que separa nivel actual de los umbrales
+        st.markdown(barra_umbral_html(loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"]), unsafe_allow_html=True)
+
+        # Metadata en chips, separada del nivel/umbrales
+        precip_txt = f"{precip:.0f} mm" if precip is not None else "Sin dato"
+        conectado_txt = "Sí, en vivo" if loc["conectado"] else "No, dato de referencia"
+        st.markdown(
+            f"""
+            <div class="meta-grid">
+              <div class="meta-chip">
+                <div class="meta-chip-label">Precipitación acumulada</div>
+                <div class="meta-chip-value">{precip_txt}</div>
+              </div>
+              <div class="meta-chip">
+                <div class="meta-chip-label">Conectado en vivo</div>
+                <div class="meta-chip-value">{conectado_txt}</div>
+              </div>
+              <div class="meta-chip">
+                <div class="meta-chip-label">Última verificación</div>
+                <div class="meta-chip-value">{loc['ultima_verificacion']}</div>
+              </div>
+              <div class="meta-chip">
+                <div class="meta-chip-label">Fuente</div>
+                <div class="meta-chip-value">{loc['fuente']}</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown('<div class="analisis-label">📊 Análisis</div>', unsafe_allow_html=True)
         st.markdown(
             analizar(
                 loc["nombre"], loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"],
