@@ -1,0 +1,23 @@
+{
+  "name": "Portal Hídrico Chaco",
+  "short_name": "Portal Hídrico",
+  "description": "Monitoreo hidrológico en tiempo real de las cuencas y localidades de riesgo del Chaco.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#090D1A",
+  "theme_color": "#090D1A",
+  "icons": [
+    {
+      "src": "./static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
