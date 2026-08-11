@@ -1,426 +1,667 @@
 """
-   Portal Hidrico Chaco - Dashboard (Streamlit).
+Portal Hidrico Chaco - Dashboard (Streamlit).
 
-Fuente unica de datos para el dashboard de Streamlit y el bot de
-Telegram, asi no quedan datos duplicados y desincronizados entre
-proyectos.
+Consume el MISMO backend que usa el bot de Telegram (@cuencas_chaco_bot),
+para que ambas herramientas muestren siempre la misma informacion sobre
+las 4 cuencas y las 12 localidades monitoreadas.
 
-IMPORTANTE SOBRE LOS DATOS:
-Los valores de abajo son datos SEMILLA (de referencia/demostracion)
-para las localidades sin fuente publica en vivo. Las localidades con
-estacion hidrometrica de Prefectura Naval (via CIM-UNL) se actualizan
-automaticamente con el script actualizar_niveles.py. Cada localidad
-indica 'conectado: True/False' segun corresponda.
-
-UMBRALES: verificados contra la tabla oficial de Prefectura Naval
-Argentina (fich.unl.edu.ar/cim/rios/parana/alturas) el 09/08/2026.
+Backend: https://github.com/mariaelena30/cuencas-bot (main.py)
 """
 
-from datetime import datetime, timezone
+import streamlit as st
+import requests
+import folium
+from streamlit_folium import st_folium
+from datetime import datetime
 
-from fastapi import FastAPI
-from pydantic import BaseModel
+st.set_page_config(page_title="Portal Hidrico Chaco", layout="wide", page_icon="🌊")
 
-app = FastAPI(title="Portal Hidrico Chaco - API")
+BACKEND_URL = "https://cuencas-bot.onrender.com"
 
-# ---------------------------------------------------------------------
-# EXPLICACIONES EN LENGUAJE SIMPLE
-# ---------------------------------------------------------------------
-EXPLICACIONES = {
-    "nivel_metros": (
-        "Es cuanto subio el agua del rio en ese punto, medido en metros. "
-        "Cuando supera el 'umbral de alerta', hay que empezar a prestar "
-        "atencion; si supera el 'umbral de evacuacion', es momento de "
-        "seguir las indicaciones de Defensa Civil."
-    ),
-    "ndvi": (
-        "El NDVI mide que tan 'verde' y sana esta la vegetacion vista "
-        "desde satelite. Sirve como pista indirecta: cambios bruscos "
-        "pueden indicar sequia, inundacion o degradacion del suelo en "
-        "la zona."
-    ),
-    "oni": (
-        "El indice ONI mide si el oceano Pacifico esta mas caliente "
-        "(El Nino, mas lluvia en la region) o mas frio (La Nina, menos "
-        "lluvia) que lo normal. Ayuda a anticipar si se viene una "
-        "temporada mas humeda o mas seca."
-    ),
-    "precipitacion_acumulada_mm": (
-        "Es la cantidad de lluvia caida, sumada en un periodo (ultimas "
-        "24 o 72 horas), medida en milimetros. Lluvia muy concentrada "
-        "en pocas horas es lo que mas rapido puede hacer subir un rio."
-    ),
+COORDENADAS = {
+    "resistencia": (-27.4511, -58.9866),
+    "barranqueras": (-27.4815, -58.9324),
+    "corrientes": (-27.4698, -58.8306),
+    "formosa": (-26.1775, -58.1781),
+    "puerto_bermejo": (-26.8667, -58.6333),
+    "el_sauzalito": (-24.4236, -61.6842),
+    "isla_del_cerrito": (-27.3667, -58.6333),
+    "puerto_vilelas": (-27.4967, -58.9394),
+    "la_leonesa": (-27.0500, -58.6833),
+    "pampa_del_indio": (-25.9167, -59.9333),
+    "villa_rio_bermejito": (-25.6167, -60.1667),
+    "fuerte_esperanza": (-24.5333, -61.7500),
 }
 
 # ---------------------------------------------------------------------
-# CUENCAS — datos representativos de cada una de las 4 cuencas
+# TOKENS VISUALES
 # ---------------------------------------------------------------------
-CUENCAS: dict = {
-    "parana": {
-        "nombre": "Rio Parana",
-        "estacion": "Barranqueras",
-        "nivel_metros": 3.22,
-        "umbral_alerta": 6.00,
-        "umbral_evacuacion": 6.50,
-        "fuente": "Prefectura Naval Argentina (via CIM-UNL)",
-        "conectado": False,
-        "ultima_verificacion": "2026-08-04",
-    },
-    "paraguay": {
-        "nombre": "Rio Paraguay",
-        "estacion": "Puerto Bermejo / confluencia",
-        "nivel_metros": 4.10,
-        "umbral_alerta": 6.50,
-        "umbral_evacuacion": 7.00,
-        "fuente": "Prefectura Naval Argentina (via CIM-UNL)",
-        "conectado": False,
-        "ultima_verificacion": "2026-08-04",
-    },
-    "bermejo": {
-        "nombre": "Rio Bermejo",
-        "estacion": "Presidencia de la Plaza (aprox.)",
-        "nivel_metros": 2.80,
-        "umbral_alerta": 4.50,
-        "umbral_evacuacion": 5.00,
-        "fuente": "Prefectura Naval Argentina (cobertura parcial)",
-        "conectado": False,
-        "ultima_verificacion": "2026-08-04",
-    },
-    "pilcomayo": {
-        "nombre": "Rio Pilcomayo",
-        "estacion": "Zona norte de Chaco / limite con Formosa",
-        "nivel_metros": 1.95,
-        "umbral_alerta": 3.50,
-        "umbral_evacuacion": 4.00,
-        "fuente": "Reportes Prefectura / Comision Binacional (sin API publica estable)",
-        "conectado": False,
-        "ultima_verificacion": "2026-08-04",
-    },
+COLOR_ESTADO = {
+    "NORMAL": {"hex": "#2ED573", "folium": "green", "label": "Normal"},
+    "ALERTA": {"hex": "#FFC93C", "folium": "orange", "label": "Alerta"},
+    "EVACUACION": {"hex": "#FF4D6D", "folium": "red", "label": "Evacuación"},
+}
+ACENTO_ROSA = "#EC4899"
+ACENTO_VIOLETA = "#7C5CFC"
+ACENTO_VERDE = "#3DDC84"
+ACENTO_CELESTE = "#38BDF8"
+
+CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+
+html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
+
+.stApp {
+    background: #090D1A;
+    color: #F5F6FA;
 }
 
-# ---------------------------------------------------------------------
-# LOCALIDADES — cada una con su cuenca_clave para poder agruparlas
-#
-# Umbrales corregidos (verificados 09/08/2026 contra fich.unl.edu.ar):
-#   barranqueras       6.00 / 6.50  (ya coincidia)
-#   corrientes         6.00 / 6.50  ->  6.50 / 7.00
-#   formosa            5.50 / 6.00  ->  7.80 / 8.30
-#   isla_del_cerrito    5.50 / 6.00  ->  6.20 / 6.80
-#   puerto_bermejo     4.50 / 5.00  ->  6.50 / 7.00  (estacion "Bermejo")
-#   la_leonesa         5.50 / 6.00  ->  6.50 / 7.00  (estacion "Las Palmas")
-#   resistencia, puerto_vilelas: usan umbral de Barranqueras (mismo tramo)
-#   el_sauzalito, pampa_del_indio, villa_rio_bermejito, fuerte_esperanza:
-#     sin fuente publica de umbrales verificada, se mantienen como estaban
-# ---------------------------------------------------------------------
-localidades: dict = {
-    "resistencia": {
-        "nombre": "Resistencia", "cuenca_clave": "parana", "nivel_metros": 3.15,
-        "umbral_alerta": 6.00, "umbral_evacuacion": 6.50, "precipitacion_acumulada_mm": 12.0,
-        "fuente": "Prefectura Naval Argentina, estacion Barranqueras (mismo tramo, ~8km)",
-        "conectado": False, "ultima_verificacion": "2026-08-04",
-    },
-    "barranqueras": {
-        "nombre": "Barranqueras", "cuenca_clave": "parana", "nivel_metros": 3.22,
-        "umbral_alerta": 6.00, "umbral_evacuacion": 6.50, "precipitacion_acumulada_mm": 12.0,
-        "fuente": "Prefectura Naval Argentina, estacion Barranqueras (medicion directa)",
-        "conectado": False, "ultima_verificacion": "2026-08-04",
-    },
-    "corrientes": {
-        "nombre": "Corrientes (capital)", "cuenca_clave": "parana", "nivel_metros": 3.30,
-        "umbral_alerta": 6.50, "umbral_evacuacion": 7.00, "precipitacion_acumulada_mm": 11.0,
-        "fuente": "Prefectura Naval Argentina, estacion Corrientes (medicion directa)",
-        "conectado": False, "ultima_verificacion": "2026-08-04",
-    },
-    "formosa": {
-        "nombre": "Formosa (capital)", "cuenca_clave": "paraguay", "nivel_metros": 4.05,
-        "umbral_alerta": 7.80, "umbral_evacuacion": 8.30, "precipitacion_acumulada_mm": 8.0,
-        "fuente": "Prefectura Naval Argentina, estacion Formosa (medicion directa)",
-        "conectado": False, "ultima_verificacion": "2026-08-04",
-    },
-    "puerto_bermejo": {
-        "nombre": "Puerto Bermejo", "cuenca_clave": "paraguay", "nivel_metros": 2.75,
-        "umbral_alerta": 6.50, "umbral_evacuacion": 7.00, "precipitacion_acumulada_mm": 15.0,
-        "fuente": "Prefectura Naval Argentina, estacion Bermejo (aproximado, zona de confluencia)",
-        "conectado": False, "ultima_verificacion": "2026-08-04",
-    },
-    "el_sauzalito": {
-        "nombre": "El Sauzalito", "cuenca_clave": "pilcomayo", "nivel_metros": 1.90,
-        "umbral_alerta": 3.50, "umbral_evacuacion": 4.00, "precipitacion_acumulada_mm": 5.0,
-        "fuente": "Reportes Prefectura / Comision Binacional (sin API publica estable)",
-        "conectado": False, "ultima_verificacion": "2026-08-04",
-    },
-    "isla_del_cerrito": {
-        "nombre": "Isla del Cerrito", "cuenca_clave": "paraguay", "nivel_metros": 3.35,
-        "umbral_alerta": 6.20, "umbral_evacuacion": 6.80, "precipitacion_acumulada_mm": 12.0,
-        "fuente": "Prefectura Naval Argentina, estacion Isla del Cerrito (medicion directa)",
-        "conectado": False, "ultima_verificacion": "2026-08-04",
-    },
-    "puerto_vilelas": {
-        "nombre": "Puerto Vilelas", "cuenca_clave": "parana", "nivel_metros": 3.20,
-        "umbral_alerta": 6.00, "umbral_evacuacion": 6.50, "precipitacion_acumulada_mm": 12.0,
-        "fuente": "Prefectura Naval Argentina, estacion Barranqueras (mismo tramo, ~5km)",
-        "conectado": False, "ultima_verificacion": "2026-08-04",
-    },
-    "la_leonesa": {
-        "nombre": "La Leonesa", "cuenca_clave": "paraguay", "nivel_metros": 3.90,
-        "umbral_alerta": 6.50, "umbral_evacuacion": 7.00, "precipitacion_acumulada_mm": 10.0,
-        "fuente": "Prefectura Naval Argentina, estacion Las Palmas (aproximado, ~5km)",
-        "conectado": False, "ultima_verificacion": "2026-08-04",
-    },
-    "pampa_del_indio": {
-        "nombre": "Pampa del Indio", "cuenca_clave": "bermejo", "nivel_metros": 2.90,
-        "umbral_alerta": 4.50, "umbral_evacuacion": 5.00, "precipitacion_acumulada_mm": 15.0,
-        "fuente": "Prefectura Naval Argentina (cobertura parcial)",
-        "conectado": False, "ultima_verificacion": "2026-08-04",
-    },
-    "villa_rio_bermejito": {
-        "nombre": "Villa Rio Bermejito", "cuenca_clave": "bermejo", "nivel_metros": 2.70,
-        "umbral_alerta": 4.50, "umbral_evacuacion": 5.00, "precipitacion_acumulada_mm": 15.0,
-        "fuente": "Prefectura Naval Argentina (cobertura parcial)",
-        "conectado": False, "ultima_verificacion": "2026-08-04",
-    },
-    "fuerte_esperanza": {
-        "nombre": "Fuerte Esperanza", "cuenca_clave": "pilcomayo", "nivel_metros": 1.85,
-        "umbral_alerta": 3.50, "umbral_evacuacion": 4.00, "precipitacion_acumulada_mm": 6.0,
-        "fuente": "Reportes Prefectura / Comision Binacional (sin API publica estable)",
-        "conectado": False, "ultima_verificacion": "2026-08-04",
-    },
+/* ---------- Hero ---------- */
+.hero-wrap { padding: 1.8rem 0 .9rem 0; }
+.hero-eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-weight: 600; letter-spacing: .14em;
+    text-transform: uppercase; font-size: .72rem; color: #7C5CFC;
+    margin-bottom: .7rem; display:flex; align-items:center; gap:.5rem;
+}
+.hero-eyebrow .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #3DDC84;
+    box-shadow: 0 0 0 3px rgba(61,220,132,0.18);
+    display:inline-block;
+}
+.hero-title {
+    font-family: 'Fraunces', serif; font-weight: 700; font-size: 2.85rem;
+    line-height: 1.05; color: #FFFFFF; margin: 0 0 .55rem 0;
+}
+.hero-sub {
+    font-family: 'Inter', sans-serif; font-size: 1rem; color: #A8AFC2;
+    max-width: 660px; line-height: 1.55;
+}
+.accent-line {
+    width: 100%; height: 4px; margin: 1.3rem 0 1.7rem 0; border-radius: 999px;
+    background: linear-gradient(90deg, #EC4899 0%, #7C5CFC 45%, #3DDC84 100%);
 }
 
-# ---------------------------------------------------------------------
-# BARRIOS VULNERABLES — puntos especificos DENTRO de una localidad que
-# son historicamente mas golpeados por las crecidas que el resto de la
-# ciudad. No tienen nivel de rio propio: heredan el estado (Normal/
-# Alerta/Evacuacion) de su localidad_padre. Son para dar mas precision
-# visual en el mapa, marcados con datos de investigacion historica,
-# no con medicion en vivo propia.
-#
-# IMPORTANTE SOBRE PRECISION: villa_rio_negro, san_pedro_pescador,
-# antequeras y la_floresta tienen coordenadas confirmadas via fuentes
-# publicas (OpenStreetMap/Mapcarta/derutasydestinos). santa_lucia y
-# mujeres_argentinas usan coordenadas APROXIMADAS (no se encontro un
-# registro con coordenadas exactas), aclarado en su campo "precision".
-# ---------------------------------------------------------------------
-BARRIOS_VULNERABLES: dict = {
-    "villa_rio_negro": {
-        "nombre": "Villa Río Negro", "localidad_padre": "resistencia",
-        "lat": -27.4253, "lon": -58.9764, "precision": "confirmada",
-        "motivo": "Inundado en la crecida de 1982 tras el colapso del dique del Río Negro",
-    },
-    "mujeres_argentinas": {
-        "nombre": "Mujeres Argentinas", "localidad_padre": "resistencia",
-        "lat": -27.4253, "lon": -58.9764, "precision": "aproximada (cerca de Villa Río Negro)",
-        "motivo": "Ex Golf Club; inundado en la crecida de 1982",
-    },
-    "santa_lucia": {
-        "nombre": "Santa Lucía", "localidad_padre": "resistencia",
-        "lat": -27.4200, "lon": -58.9800, "precision": "aproximada",
-        "motivo": "Identificado como uno de los barrios históricamente más afectados de Resistencia",
-    },
-    "san_pedro_pescador": {
-        "nombre": "San Pedro Pescador (Barrio de los Pescadores)", "localidad_padre": "barranqueras",
-        "lat": -27.46085, "lon": -58.86805, "precision": "confirmada",
-        "motivo": "Único asentamiento del Chaco sobre el cauce principal del Paraná; 43 familias autoevacuadas en 2014",
-    },
-    "antequeras": {
-        "nombre": "Puerto Antequeras", "localidad_padre": "barranqueras",
-        "lat": -27.4425, "lon": -58.8503, "precision": "confirmada",
-        "motivo": "Zona pesquera ribereña, afectada en múltiples crecidas históricas",
-    },
-    "la_floresta": {
-        "nombre": "La Floresta", "localidad_padre": "formosa",
-        "lat": -26.1547, "lon": -58.1794, "precision": "confirmada",
-        "motivo": "Junto al Riacho Formosa, que recibe agua de las crecidas del Pilcomayo y Bermejo",
-    },
-    "tres_bocas": {
-        "nombre": "Paraje Las Tres Bocas", "localidad_padre": "puerto_vilelas",
-        "lat": -27.5300, "lon": -58.8600, "precision": "aproximada",
-        "motivo": "Zona ribereña que queda aislada por tierra en crecidas grandes; en 2023, con Barranqueras en 6.54 m (evacuación), ~150 familias solo accedían en lancha desde Empedrado (Corrientes). Los parajes vecinos Soto y Cinco Bocas sufren el mismo aislamiento.",
-    },
+/* ---------- Section headers ---------- */
+.section-eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-weight: 600; letter-spacing: .1em;
+    text-transform: uppercase; font-size: .7rem; color: #7C5CFC; margin-bottom: .2rem;
+}
+.section-title {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.55rem;
+    color: #FFFFFF; margin: 0 0 1.1rem 0;
 }
 
-
-satelital_ndvi = {
-    "ndvi_promedio": 0.48,
-    "condicion_vegetacion": "ESTABLE",
-    "conectado": False,
-    "ultima_verificacion": "2026-08-04",
+/* ---------- Contexto de hoy ---------- */
+.contexto-banner {
+    background: #10152A; border: 1px solid rgba(124,92,252,0.35);
+    border-left: 4px solid #7C5CFC; border-radius: 10px;
+    padding: .9rem 1.1rem; margin: 0 0 1.4rem 0; font-size: .92rem; color: #D3D7E8;
 }
 
-clima = {
-    "fase_oni": "Neutro",
-    "ultimo_valor_oni": 0.45,
-    "conectado": False,
-    "ultima_verificacion": "2026-08-04",
+/* ---------- Gauge card (resumen de cuenca) ---------- */
+.gauge-card {
+    background: #10152A;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-top: 3px solid var(--gauge-accent, #7C5CFC);
+    border-radius: 14px; padding: 1.15rem 1.25rem 1.3rem 1.25rem;
+    margin-bottom: .9rem;
+}
+.gauge-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.3rem; }
+.gauge-name { font-family:'Fraunces', serif; font-weight:600; font-size:1.1rem; color:#FFFFFF; }
+.gauge-badge {
+    font-family:'Inter', sans-serif; font-weight:700; font-size:.64rem; letter-spacing:.06em;
+    text-transform: uppercase; padding: .2rem .6rem; border-radius: 999px; color:#090D1A;
+}
+.gauge-station { font-size:.78rem; color:#8890A6; margin-bottom:1rem; }
+.gauge-value-row { display:flex; align-items:baseline; gap:.4rem; margin-bottom:.55rem; }
+.gauge-value { font-family:'Fraunces', serif; font-weight:700; font-size:1.75rem; color:#FFFFFF; }
+.gauge-value-unit { font-size:.85rem; color:#7A8296; }
+.gauge-foot { font-size:.7rem; color:#6E7690; margin-top:.7rem; }
+
+/* ---------- Barra de umbrales (el elemento visual central) ----------
+   Separa claramente TRES cosas: la zona normal, la zona de alerta y la
+   zona de evacuacion, y marca con un pin donde esta el nivel actual. */
+.umbral-wrap { margin: .3rem 0 .2rem 0; }
+.umbral-barra {
+    position: relative; width: 100%; height: 10px; border-radius: 999px;
+    display: flex; overflow: visible; margin-bottom: 1.6rem;
+}
+.umbral-zona { height: 100%; }
+.umbral-zona.normal { background: linear-gradient(90deg, #1a4d33, #2ED573); border-radius: 999px 0 0 999px; }
+.umbral-zona.alerta { background: #FFC93C; }
+.umbral-zona.evacuacion { background: linear-gradient(90deg, #FF4D6D, #c92c47); border-radius: 0 999px 999px 0; }
+.umbral-pin {
+    position: absolute; top: -9px; width: 3px; height: 28px;
+    background: #FFFFFF; border-radius: 2px;
+    box-shadow: 0 0 0 2px #090D1A, 0 0 8px rgba(255,255,255,0.5);
+}
+.umbral-pin-label {
+    position: absolute; top: -30px; transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: .68rem;
+    color: #FFFFFF; background: rgba(0,0,0,0.55); padding: .12rem .4rem; border-radius: 5px;
+    white-space: nowrap;
+}
+.umbral-marca {
+    position: absolute; top: 14px; transform: translateX(-50%);
+    font-size: .62rem; color: #7A8296; white-space: nowrap; text-align: center;
+}
+.umbral-marca .valor { color: #A8AFC2; font-weight: 600; }
+
+/* ---------- Chips de metadata (fuente, precipitacion, etc) ---------- */
+.meta-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: .6rem; margin: 1rem 0 1.1rem 0;
+}
+.meta-chip {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px; padding: .65rem .8rem;
+}
+.meta-chip-label {
+    font-family: 'JetBrains Mono', monospace; font-size: .62rem; letter-spacing: .05em;
+    text-transform: uppercase; color: #7A8296; margin-bottom: .25rem;
+}
+.meta-chip-value { font-size: .86rem; color: #F5F6FA; font-weight: 500; line-height: 1.35; }
+
+/* ---------- Bloque de analisis ---------- */
+.analisis-label {
+    font-family: 'JetBrains Mono', monospace; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; font-size: .68rem; color: #3DDC84;
+    margin: 1.1rem 0 .5rem 0; display:flex; align-items:center; gap:.4rem;
 }
 
+/* ---------- Localidad chip list (mapa) ---------- */
+.loc-chip {
+    display:inline-flex; align-items:center; gap:.4rem;
+    background: #10152A; border:1px solid rgba(255,255,255,0.08);
+    border-radius: 999px; padding:.3rem .7rem; margin: .15rem .3rem .15rem 0;
+    font-size:.8rem; color:#D3D7E8;
+}
+.loc-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+
+.footer-note { font-size:.76rem; color:#565D75; text-align:center; padding: 1.4rem 0 .6rem 0; }
+
+hr { border-color: rgba(255,255,255,0.08) !important; }
+[data-testid="stExpander"] {
+    background: #10152A; border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+}
+[data-testid="stExpander"] summary {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.02rem;
+}
+[data-testid="stMetricValue"] { color: #FFFFFF; }
+[data-testid="stAlert"] { border-radius: 10px; }
+</style>
+"""
+
+st.markdown(CSS, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# CLASIFICACION DE ESTADO (verde/amarillo/rojo) — compartida
+# PWA: conecta el manifest.json e iconos para que "Agregar a pantalla
+# de inicio" desde el celular use el icono propio y abra en pantalla
+# completa. Streamlit no permite tocar el <head> directamente, asi que
+# se inyecta con un poco de JS apuntando al documento padre.
+# Requiere: carpeta static/ (manifest.json, icon-192.png, icon-512.png)
+# y .streamlit/config.toml con enableStaticServing = true.
 # ---------------------------------------------------------------------
-def calcular_estado(nivel: float, umbral_alerta: float, umbral_evacuacion: float):
-    if nivel >= umbral_evacuacion:
-        return "EVACUACION", "🔴"
-    if nivel >= umbral_alerta:
-        return "ALERTA", "🟡"
-    return "NORMAL", "🟢"
+import streamlit.components.v1 as components
 
+components.html(
+    """
+    <script>
+    (function() {
+        const head = window.parent.document.head;
+        if (head.querySelector('link[rel="manifest"]')) return;  // no duplicar
 
-def _cuenca_con_estado(clave: str) -> dict:
-    c = CUENCAS[clave]
-    estado, emoji = calcular_estado(c["nivel_metros"], c["umbral_alerta"], c["umbral_evacuacion"])
-    return {**c, "clave": clave, "estado": estado, "emoji": emoji}
+        const manifest = document.createElement('link');
+        manifest.rel = 'manifest';
+        manifest.href = './static/manifest.json';
+        head.appendChild(manifest);
 
+        const icono = document.createElement('link');
+        icono.rel = 'apple-touch-icon';
+        icono.href = './static/icon-192.png';
+        head.appendChild(icono);
 
-def _localidad_con_estado(clave: str) -> dict:
-    loc = localidades[clave]
-    estado, emoji = calcular_estado(loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"])
-    return {**loc, "clave": clave, "estado": estado, "emoji": emoji}
+        const temaColor = document.createElement('meta');
+        temaColor.name = 'theme-color';
+        temaColor.content = '#090D1A';
+        head.appendChild(temaColor);
+
+        const appleCapable = document.createElement('meta');
+        appleCapable.name = 'apple-mobile-web-app-capable';
+        appleCapable.content = 'yes';
+        head.appendChild(appleCapable);
+    })();
+    </script>
+    """,
+    height=0,
+    width=0,
+)
+
+ACENTO_POR_INDICE = [ACENTO_ROSA, ACENTO_VIOLETA, ACENTO_VERDE, ACENTO_CELESTE]
 
 
 # ---------------------------------------------------------------------
-# MODELOS para los endpoints de actualizacion manual
+# BARRA DE UMBRALES: el elemento visual que separa nivel actual de
+# los umbrales de alerta/evacuacion. Se usa tanto en el resumen de
+# cuencas como en el detalle de cada localidad.
 # ---------------------------------------------------------------------
-class ActualizacionHidrologia(BaseModel):
-    localidad: str
-    nivel_metros: float
-    precipitacion_acumulada_mm: float | None = None
+def barra_umbral_html(nivel, umbral_alerta, umbral_evacuacion) -> str:
+    tope = max(umbral_evacuacion * 1.15, nivel * 1.05)
+    pct_alerta = min(umbral_alerta / tope * 100, 100)
+    pct_evac = min(umbral_evacuacion / tope * 100, 100)
+    pct_nivel = min(nivel / tope * 100, 100)
+
+    ancho_normal = pct_alerta
+    ancho_alerta = pct_evac - pct_alerta
+    ancho_evac = 100 - pct_evac
+
+    return f"""
+    <div class="umbral-wrap">
+      <div class="umbral-barra">
+        <div class="umbral-zona normal" style="width:{ancho_normal:.1f}%"></div>
+        <div class="umbral-zona alerta" style="width:{ancho_alerta:.1f}%"></div>
+        <div class="umbral-zona evacuacion" style="width:{ancho_evac:.1f}%"></div>
+        <div class="umbral-pin" style="left:{pct_nivel:.1f}%"></div>
+        <div class="umbral-pin-label" style="left:{pct_nivel:.1f}%">{nivel} m</div>
+        <div class="umbral-marca" style="left:{pct_alerta:.1f}%">Alerta<br/><span class="valor">{umbral_alerta} m</span></div>
+        <div class="umbral-marca" style="left:{pct_evac:.1f}%">Evacuación<br/><span class="valor">{umbral_evacuacion} m</span></div>
+      </div>
+    </div>
+    """
 
 
-class ActualizacionSatelital(BaseModel):
-    ndvi_promedio: float
-    condicion_vegetacion: str
+def gauge_html(nombre, estacion, nivel, umbral_alerta, umbral_evac, estado, fuente,
+                conectado, actualizado, acento) -> str:
+    estilo = COLOR_ESTADO.get(estado, COLOR_ESTADO["NORMAL"])
+    etiqueta_conexion = "✅ En vivo" if conectado else "⚠️ Referencia"
+    return f"""
+    <div class="gauge-card" style="--gauge-accent:{acento}">
+      <div class="gauge-top">
+        <span class="gauge-name">{nombre}</span>
+        <span class="gauge-badge" style="background:{estilo['hex']}">{estilo['label']}</span>
+      </div>
+      <div class="gauge-station">{estacion}</div>
+      <div class="gauge-value-row">
+        <span class="gauge-value">{nivel}</span>
+        <span class="gauge-value-unit">metros — nivel actual</span>
+      </div>
+      {barra_umbral_html(nivel, umbral_alerta, umbral_evac)}
+      <div class="gauge-foot">{etiqueta_conexion} · {fuente}<br/>Actualizado: {actualizado}</div>
+    </div>
+    """
 
 
-class ActualizacionClima(BaseModel):
-    fase_oni: str
-    ultimo_valor_oni: float
+def contexto_estacional(mes: int) -> str:
+    if mes in (12, 1, 2, 3):
+        return (
+            "Estamos en **verano** (dic-mar), la temporada de mayores lluvias en la "
+            "región. Es el período del año con más probabilidad de crecidas rápidas."
+        )
+    if mes in (4, 5, 6):
+        return (
+            "Estamos en **otoño** (abr-jun). Las lluvias empiezan a disminuir y los "
+            "niveles suelen ir estabilizándose o bajando respecto al verano."
+        )
+    if mes in (7, 8, 9):
+        return (
+            "Estamos en **invierno** (jul-sep), la temporada típicamente más seca del "
+            "año. Es habitual que los niveles estén en su punto más bajo (bajante)."
+        )
+    return (
+        "Estamos en **primavera** (oct-nov). La humedad y las lluvias empiezan a "
+        "aumentar de cara al verano, y los niveles suelen empezar a recuperarse."
+    )
+
+
+def interpretar_nivel_relativo(nivel, umbral_alerta, estado) -> str:
+    if estado == "EVACUACION":
+        return "El nivel ya superó el umbral de evacuación: es la situación más crítica de la escala."
+    if estado == "ALERTA":
+        return "El nivel ya superó el umbral de alerta, aunque todavía no llega al de evacuación."
+    ratio = nivel / umbral_alerta if umbral_alerta else 0
+    if ratio < 0.5:
+        return f"El nivel actual está muy por debajo del umbral de alerta (~{ratio*100:.0f}%) — típico de bajante."
+    if ratio < 0.8:
+        return f"El nivel está dentro de un rango considerado normal, en torno al {ratio*100:.0f}% del umbral de alerta."
+    return f"El nivel se está acercando al umbral de alerta (ya en el {ratio*100:.0f}%) — conviene monitorear con más frecuencia."
+
+
+def interpretar_precipitacion(precip_mm) -> str:
+    if precip_mm is None:
+        return ""
+    if precip_mm < 10:
+        nivel_txt = "baja"
+    elif precip_mm < 30:
+        nivel_txt = "moderada"
+    elif precip_mm < 60:
+        nivel_txt = "alta"
+    else:
+        nivel_txt = "muy alta"
+    return f"Precipitación acumulada reciente: **{precip_mm:.0f} mm** (acumulación {nivel_txt})."
+
+
+def analizar(nombre, nivel, umbral_alerta, umbral_evacuacion, estado, fase_oni, mes, precip_mm=None) -> str:
+    interpretacion = interpretar_nivel_relativo(nivel, umbral_alerta, estado)
+    estacional = contexto_estacional(mes)
+    if fase_oni == "El Niño":
+        nota_oni = "Fase climática actual: **El Niño**, asociada históricamente a más lluvia de lo habitual en la región."
+    elif fase_oni == "La Niña":
+        nota_oni = "Fase climática actual: **La Niña**, asociada históricamente a menos lluvia de lo habitual en la región."
+    else:
+        nota_oni = "Fase climática actual: **Neutra**, sin señal fuerte de más o menos lluvia asociada a este factor."
+    partes = [interpretacion, estacional, nota_oni]
+    nota_precip = interpretar_precipitacion(precip_mm)
+    if nota_precip:
+        partes.append(nota_precip)
+    return "\n\n".join(partes)
+
+
+@st.cache_data(ttl=60)
+def cargar_datos():
+    try:
+        r_cuencas = requests.get(f"{BACKEND_URL}/cuencas", timeout=8.0)
+        r_localidades = requests.get(f"{BACKEND_URL}/localidades", timeout=8.0)
+        r_cuencas.raise_for_status()
+        r_localidades.raise_for_status()
+        fase_oni = "Neutro"
+        try:
+            r_clima = requests.get(f"{BACKEND_URL}/bot/consultar", timeout=5.0)
+            fase_oni = r_clima.json().get("clima", {}).get("fase_oni", "Neutro")
+        except Exception:
+            pass
+        barrios = {}
+        try:
+            r_barrios = requests.get(f"{BACKEND_URL}/barrios", timeout=5.0)
+            barrios = r_barrios.json().get("barrios", {})
+        except Exception:
+            pass
+        return r_cuencas.json(), r_localidades.json(), fase_oni, barrios
+    except Exception:
+        return None, None, "Neutro", {}
 
 
 # ---------------------------------------------------------------------
-# ENDPOINTS
+# HERO
 # ---------------------------------------------------------------------
-@app.get("/")
-def raiz():
-    return {"servicio": "Portal Hidrico Chaco - API", "estado": "activo"}
+st.markdown(
+    """
+    <div class="hero-wrap">
+        <span class="hero-eyebrow"><span class="dot"></span>Monitoreo hidrológico en tiempo real</span>
+        <h1 class="hero-title">Portal Hídrico Chaco</h1>
+        <p class="hero-sub">Estado de las 4 cuencas principales y 12 localidades de riesgo
+        de la provincia, con la misma información que ves en el bot de Telegram
+        @cuencas_chaco_bot.</p>
+    </div>
+    <div class="accent-line"></div>
+    """,
+    unsafe_allow_html=True,
+)
 
+datos_cuencas, datos_localidades, fase_oni_actual, datos_barrios = cargar_datos()
 
-@app.get("/localidades")
-def listar_localidades():
-    """Devuelve todas las localidades con su estado calculado."""
-    return {
-        "localidades": {clave: _localidad_con_estado(clave) for clave in localidades},
-        "explicaciones": EXPLICACIONES,
-    }
+if datos_cuencas is None:
+    st.error(
+        "⚠️ No se pudo conectar con el backend en este momento. "
+        "Si el servicio estaba dormido por inactividad (plan gratuito de Render), "
+        "puede tardar hasta 50 segundos en despertar. Volvé a cargar la página en un momento."
+    )
+    st.stop()
 
+cuencas = datos_cuencas["cuencas"]
+explicaciones = datos_cuencas["explicaciones"]
+localidades = datos_localidades["localidades"]
+mes_actual = datetime.now().month
 
-@app.get("/localidades/{clave}")
-def obtener_localidad(clave: str):
-    clave = clave.lower()
-    if clave not in localidades:
-        return {"error": f"Localidad '{clave}' no encontrada"}
-    return {"localidad": _localidad_con_estado(clave), "explicaciones": EXPLICACIONES}
+con_conexion = sum(1 for c in cuencas.values() if c["conectado"])
+if con_conexion == 0:
+    st.info(
+        "ℹ️ **Sobre estos datos:** todos los valores que ves abajo son datos de "
+        "*referencia* (semilla), cargados manualmente para poder demostrar el "
+        "sistema mientras se integra una fuente en vivo. Ninguno está conectado "
+        "todavía a una fuente automática en tiempo real — cada tarjeta lo indica."
+    )
 
+st.markdown(
+    f'<div class="contexto-banner">🗓️ <b>Contexto de hoy:</b> {contexto_estacional(mes_actual)}</div>',
+    unsafe_allow_html=True,
+)
 
-@app.get("/cuencas")
-def listar_cuencas():
-    """Devuelve las 4 cuencas con su estado calculado (para /cuencas del bot)."""
-    return {
-        "cuencas": {clave: _cuenca_con_estado(clave) for clave in CUENCAS},
-        "explicaciones": EXPLICACIONES,
-    }
+col_a, col_b = st.columns(2)
+with col_a:
+    with st.expander("📖 ¿Qué significa cada dato? (para quien no es técnico)"):
+        for clave, texto in explicaciones.items():
+            st.markdown(f"**{clave.replace('_', ' ').capitalize()}:** {texto}")
+    with st.expander("🚨 ¿Qué hacer según el estado? (protocolo general)"):
+        st.markdown(
+            """
+Guía **general y orientativa**, no un protocolo oficial. Ante cualquier
+alerta real, la indicación válida es siempre la que emita **Defensa Civil
+de tu localidad**.
 
+- 🟢 **NORMAL:** monitoreo pasivo, sin acción especial.
+- 🟡 **ALERTA:** revisá lo esencial (documentos, medicamentos, ropa) y
+  estate atento a los canales oficiales.
+- 🔴 **EVACUACIÓN:** seguí estrictamente las indicaciones de Defensa Civil
+  y autoridades locales.
+"""
+        )
+with col_b:
+    with st.expander("🌎 Contexto: ¿en qué se basa este sistema de alerta?"):
+        st.markdown(
+            """
+Este portal usa la misma lógica de **3 niveles** (normal, alerta, evacuación)
+que emplea el **Sistema de Información y Alerta Hidrológico (SIyAH)** del
+Instituto Nacional del Agua (INA), que desde 1983 monitorea la Cuenca del
+Plata en cinco países y emite pronósticos usados por Defensa Civil en toda
+la región.
 
-@app.get("/cuencas/{clave}")
-def obtener_cuenca(clave: str):
-    """Devuelve una cuenca puntual junto con las localidades que le pertenecen."""
-    clave = clave.lower()
-    if clave not in CUENCAS:
-        return {"error": f"Cuenca '{clave}' no encontrada"}
-    localidades_de_la_cuenca = [
-        _localidad_con_estado(c) for c, v in localidades.items() if v["cuenca_clave"] == clave
-    ]
-    return {
-        "cuenca": _cuenca_con_estado(clave),
-        "localidades": localidades_de_la_cuenca,
-        "explicaciones": EXPLICACIONES,
-    }
+Es una **herramienta complementaria y de demostración** — no reemplaza el
+reporte oficial de INA, consultable en alerta.ina.gob.ar.
 
+**Fuente:** Instituto Nacional del Agua (INA).
+"""
+        )
+    with st.expander("📊 Nota metodológica sobre el análisis"):
+        st.markdown(
+            """
+Las secciones de "Análisis y contexto" de cada cuenca combinan:
+1. Qué tan cerca está el nivel actual del umbral de alerta (en %).
+2. La época del año (estación húmeda/seca típica de la región).
+3. La fase climática ONI vigente (El Niño / La Niña / Neutro).
+4. La precipitación acumulada reciente en la localidad, cuando está disponible.
 
-@app.get("/bot/consultar")
-def consultar_para_bot():
-    """Endpoint de compatibilidad con el dashboard de Streamlit actual."""
-    barr = _localidad_con_estado("barranqueras")
-    return {
-        "clima": clima,
-        "hidrologia": {
-            "estacion": barr["nombre"],
-            "nivel_metros": barr["nivel_metros"],
-            "estado": barr["estado"],
-            "umbral_alerta": barr["umbral_alerta"],
-            "umbral_evacuacion": barr["umbral_evacuacion"],
-            "fuente": barr["fuente"],
-            "ultima_verificacion": barr["ultima_verificacion"],
-        },
-        "satelital_ndvi": satelital_ndvi,
-    }
+Es una lectura **orientativa basada en patrones históricos generales**,
+no un pronóstico oficial.
+"""
+        )
 
+st.markdown("---")
 
-@app.get("/barrios")
-def listar_barrios():
-    """Todos los barrios vulnerables, con el estado de su localidad padre."""
-    resultado = {}
-    for clave, b in BARRIOS_VULNERABLES.items():
-        padre = _localidad_con_estado(b["localidad_padre"])
-        resultado[clave] = {
-            **b, "clave": clave,
-            "estado": padre["estado"], "emoji": padre["emoji"],
-            "nombre_localidad_padre": padre["nombre"],
-        }
-    return {"barrios": resultado}
+# ---------------------------------------------------------------------
+# GAUGES DE LAS 4 CUENCAS
+# ---------------------------------------------------------------------
+st.markdown(
+    '<div class="section-eyebrow">Panorama general</div>'
+    '<div class="section-title">🌊 Estado de las 4 cuencas</div>',
+    unsafe_allow_html=True,
+)
+cols = st.columns(4)
+for i, (col, (clave, c)) in enumerate(zip(cols, cuencas.items())):
+    with col:
+        st.markdown(
+            gauge_html(
+                c["nombre"], c["estacion"], c["nivel_metros"], c["umbral_alerta"],
+                c["umbral_evacuacion"], c["estado"], c["fuente"], c["conectado"],
+                c["ultima_verificacion"], ACENTO_POR_INDICE[i % len(ACENTO_POR_INDICE)],
+            ),
+            unsafe_allow_html=True,
+        )
+        with st.expander("📊 Análisis y contexto"):
+            st.markdown(
+                analizar(
+                    c["nombre"], c["nivel_metros"], c["umbral_alerta"], c["umbral_evacuacion"],
+                    c["estado"], fase_oni_actual, mes_actual,
+                )
+            )
 
+st.markdown("---")
 
-@app.get("/barrios/{localidad_clave}")
-def barrios_de_localidad(localidad_clave: str):
-    """Barrios vulnerables que pertenecen a una localidad puntual (para el bot)."""
-    localidad_clave = localidad_clave.lower()
-    if localidad_clave not in localidades:
-        return {"error": f"Localidad '{localidad_clave}' no encontrada"}
-    padre = _localidad_con_estado(localidad_clave)
-    resultado = {
-        clave: {**b, "clave": clave, "estado": padre["estado"], "emoji": padre["emoji"]}
-        for clave, b in BARRIOS_VULNERABLES.items()
-        if b["localidad_padre"] == localidad_clave
-    }
-    return {"barrios": resultado}
+# ---------------------------------------------------------------------
+# MAPA
+# ---------------------------------------------------------------------
+st.markdown(
+    '<div class="section-eyebrow">Vista territorial</div>'
+    '<div class="section-title">🗺 Mapa de localidades monitoreadas</div>',
+    unsafe_allow_html=True,
+)
 
+mapa = folium.Map(location=[-26.5, -59.5], zoom_start=6, tiles="CartoDB dark_matter")
 
-@app.post("/hidrologia/actualizar")
-def actualizar_hidrologia(datos: ActualizacionHidrologia):
-    clave = datos.localidad.lower()
-    if clave not in localidades:
-        return {"error": f"Localidad '{datos.localidad}' no reconocida"}
-    localidades[clave]["nivel_metros"] = datos.nivel_metros
-    if datos.precipitacion_acumulada_mm is not None:
-        localidades[clave]["precipitacion_acumulada_mm"] = datos.precipitacion_acumulada_mm
-    localidades[clave]["conectado"] = True
-    localidades[clave]["ultima_verificacion"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    return {"ok": True, "localidad": _localidad_con_estado(clave)}
+for clave, loc in localidades.items():
+    if clave not in COORDENADAS:
+        continue
+    lat, lon = COORDENADAS[clave]
+    estilo = COLOR_ESTADO.get(loc["estado"], COLOR_ESTADO["NORMAL"])
+    etiqueta_conexion = "En vivo" if loc["conectado"] else "Dato de referencia, sin conexión automática aún"
+    precip = loc.get("precipitacion_acumulada_mm")
+    linea_precip = f"Precipitación acumulada: {precip:.0f} mm<br>" if precip is not None else ""
+    popup_html = (
+        f"<b>{loc['nombre']}</b><br>"
+        f"Nivel: {loc['nivel_metros']} m<br>"
+        f"Estado: {loc['estado']}<br>"
+        f"{linea_precip}"
+        f"Fuente: {loc['fuente']}<br>"
+        f"<i>{etiqueta_conexion}</i>"
+    )
+    folium.Marker(
+        location=[lat, lon],
+        popup=folium.Popup(popup_html, max_width=280),
+        tooltip=loc["nombre"],
+        icon=folium.Icon(color=estilo["folium"], icon="tint"),
+    ).add_to(mapa)
 
+# Barrios/zonas vulnerables: puntos mas chicos, DENTRO de su localidad,
+# con icono distinto (signo de exclamacion) para diferenciarlos de las
+# 12 localidades principales.
+for clave, b in datos_barrios.items():
+    estilo_b = COLOR_ESTADO.get(b["estado"], COLOR_ESTADO["NORMAL"])
+    aviso_precision = "" if b["precision"] == "confirmada" else f" · ubicación {b['precision']}"
+    popup_barrio = (
+        f"<b>📍 {b['nombre']}</b><br>"
+        f"<i>Zona vulnerable dentro de {b.get('nombre_localidad_padre', b['localidad_padre'])}</i><br><br>"
+        f"{b['motivo']}"
+        f"{aviso_precision}"
+    )
+    folium.CircleMarker(
+        location=[b["lat"], b["lon"]],
+        radius=7,
+        popup=folium.Popup(popup_barrio, max_width=300),
+        tooltip=f"⚠️ {b['nombre']}",
+        color="#FFFFFF",
+        weight=2,
+        fill=True,
+        fill_color=estilo_b["hex"],
+        fill_opacity=0.9,
+    ).add_to(mapa)
 
-@app.post("/satelital/actualizar")
-def actualizar_satelital(datos: ActualizacionSatelital):
-    satelital_ndvi["ndvi_promedio"] = datos.ndvi_promedio
-    satelital_ndvi["condicion_vegetacion"] = datos.condicion_vegetacion
-    satelital_ndvi["conectado"] = True
-    satelital_ndvi["ultima_verificacion"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    return {"ok": True, "satelital_ndvi": satelital_ndvi}
+st_folium(mapa, width=1100, height=500)
 
+chips = "".join(
+    f'<span class="loc-chip"><span class="loc-dot" style="background:{COLOR_ESTADO.get(l["estado"], COLOR_ESTADO["NORMAL"])["hex"]}"></span>{l["nombre"]}</span>'
+    for l in localidades.values()
+)
+st.markdown(chips, unsafe_allow_html=True)
 
-@app.post("/clima/actualizar")
-def actualizar_clima(datos: ActualizacionClima):
-    clima["fase_oni"] = datos.fase_oni
-    clima["ultimo_valor_oni"] = datos.ultimo_valor_oni
-    clima["conectado"] = True
-    clima["ultima_verificacion"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    return {"ok": True, "clima": clima}
+# ---------------------------------------------------------------------
+# BARRIOS Y ZONAS VULNERABLES
+# ---------------------------------------------------------------------
+if datos_barrios:
+    st.markdown("---")
+    st.markdown(
+        '<div class="section-eyebrow">Detalle histórico</div>'
+        '<div class="section-title">⚠️ Barrios y zonas históricamente más vulnerables</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "Estos son puntos *dentro* de una localidad que, según registros de crecidas "
+        "pasadas (1982, 1998, 2014, 2023), sufren antes y peor que el resto de la "
+        "ciudad — no tienen medición propia, comparten el estado de su localidad."
+    )
+    for clave, b in datos_barrios.items():
+        estilo_b = COLOR_ESTADO.get(b["estado"], COLOR_ESTADO["NORMAL"])
+        aviso_precision = "" if b["precision"] == "confirmada" else " · 📍 ubicación aproximada"
+        with st.expander(f"{b['emoji']} {b['nombre']} — dentro de {b.get('nombre_localidad_padre', b['localidad_padre'])}{aviso_precision}"):
+            st.markdown(f"**Por qué es vulnerable:** {b['motivo']}")
+            st.markdown(f"**Estado actual (heredado de su localidad):** {b['estado']}")
+
+st.markdown("---")
+st.markdown(
+    '<div class="section-eyebrow">Detalle</div>'
+    '<div class="section-title">📍 Detalle por localidad</div>',
+    unsafe_allow_html=True,
+)
+
+for clave, loc in localidades.items():
+    aviso = "" if loc["conectado"] else " · ⚠️ dato de referencia"
+    with st.expander(f"{loc['emoji']} {loc['nombre']} — {loc['estado']}{aviso}"):
+        estilo = COLOR_ESTADO.get(loc["estado"], COLOR_ESTADO["NORMAL"])
+        precip = loc.get("precipitacion_acumulada_mm")
+
+        # Valor grande del nivel actual + badge de estado
+        st.markdown(
+            f"""
+            <div class="gauge-value-row" style="margin-top:.2rem;">
+              <span class="gauge-value">{loc['nivel_metros']}</span>
+              <span class="gauge-value-unit">metros — nivel actual</span>
+              <span class="gauge-badge" style="background:{estilo['hex']}; margin-left:.6rem;">{estilo['label']}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Barra visual que separa nivel actual de los umbrales
+        st.markdown(barra_umbral_html(loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"]), unsafe_allow_html=True)
+
+        # Metadata en chips, separada del nivel/umbrales
+        precip_txt = f"{precip:.0f} mm" if precip is not None else "Sin dato"
+        conectado_txt = "Sí, en vivo" if loc["conectado"] else "No, dato de referencia"
+        st.markdown(
+            f"""
+            <div class="meta-grid">
+              <div class="meta-chip">
+                <div class="meta-chip-label">Precipitación acumulada</div>
+                <div class="meta-chip-value">{precip_txt}</div>
+              </div>
+              <div class="meta-chip">
+                <div class="meta-chip-label">Conectado en vivo</div>
+                <div class="meta-chip-value">{conectado_txt}</div>
+              </div>
+              <div class="meta-chip">
+                <div class="meta-chip-label">Última verificación</div>
+                <div class="meta-chip-value">{loc['ultima_verificacion']}</div>
+              </div>
+              <div class="meta-chip">
+                <div class="meta-chip-label">Fuente</div>
+                <div class="meta-chip-value">{loc['fuente']}</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown('<div class="analisis-label">📊 Análisis</div>', unsafe_allow_html=True)
+        st.markdown(
+            analizar(
+                loc["nombre"], loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"],
+                loc["estado"], fase_oni_actual, mes_actual, loc.get("precipitacion_acumulada_mm"),
+            )
+        )
+
+st.markdown(
+    '<div class="footer-note">Este portal y el bot de Telegram @cuencas_chaco_bot '
+    'comparten el mismo backend, para que la información sea siempre consistente '
+    'entre ambas herramientas.</div>',
+    unsafe_allow_html=True,
+)
