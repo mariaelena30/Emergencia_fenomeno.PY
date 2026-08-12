@@ -186,11 +186,42 @@ hr { border-color: rgba(255,255,255,0.08) !important; }
     background: #10152A; border: 1px solid rgba(255,255,255,0.08);
     border-radius: 12px;
 }
+/* El icono de flecha de Streamlit y el texto del titulo comparten fila;
+   sin estas reglas, en pantallas angostas el texto largo se envuelve
+   en 2 lineas y la flecha (que queda centrada verticalmente por
+   defecto) termina tapando la primera letra. flex-start + flex-shrink:0
+   en el icono evita la superposicion. */
 [data-testid="stExpander"] summary {
     font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.02rem;
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: .55rem;
+    line-height: 1.4;
+    padding: .7rem .6rem;
+}
+[data-testid="stExpander"] summary svg {
+    flex-shrink: 0;
+    margin-top: .2rem;
+}
+[data-testid="stExpander"] summary p {
+    margin: 0;
+    word-break: break-word;
 }
 [data-testid="stMetricValue"] { color: #FFFFFF; }
 [data-testid="stAlert"] { border-radius: 10px; }
+
+/* ---------- Ajustes para pantallas chicas (celular) ---------- */
+@media (max-width: 600px) {
+    .hero-title { font-size: 2.05rem; }
+    .hero-sub { font-size: .92rem; }
+    .section-title { font-size: 1.28rem; }
+    .gauge-value { font-size: 1.45rem; }
+    .gauge-name { font-size: 1rem; }
+    [data-testid="stExpander"] summary { font-size: .9rem; }
+    .meta-grid { grid-template-columns: 1fr 1fr; }
+    .umbral-marca { font-size: .56rem; }
+    .umbral-pin-label { font-size: .6rem; }
+}
 </style>
 """
 
