@@ -41,10 +41,10 @@ COLOR_ESTADO = {
     "ALERTA": {"hex": "#FFC93C", "folium": "orange", "label": "Alerta"},
     "EVACUACION": {"hex": "#FF4D6D", "folium": "red", "label": "Evacuación"},
 }
-ACENTO_ROSA = "#EC4899"
-ACENTO_VIOLETA = "#7C5CFC"
-ACENTO_VERDE = "#3DDC84"
-ACENTO_CELESTE = "#38BDF8"
+ACENTO_RIO_CLARO = "#38BDF8"
+ACENTO_RIO_MEDIO = "#0EA5B7"
+ACENTO_ALERTA = "#F59E0B"
+ACENTO_CRITICO = "#F43F5E"
 
 CSS = """
 <style>
@@ -68,6 +68,16 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     width: 7px; height: 7px; border-radius: 50%; background: #3DDC84;
     box-shadow: 0 0 0 3px rgba(61,220,132,0.18);
     display:inline-block;
+    @keyframes pulso-vivo {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 3px rgba(61,220,132,0.18); }
+  50% { opacity: 0.5; box-shadow: 0 0 0 6px rgba(61,220,132,0.05); }
+}
+.hero-eyebrow .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #3DDC84;
+    box-shadow: 0 0 0 3px rgba(61,220,132,0.18);
+    display:inline-block;
+    animation: pulso-vivo 2s ease-in-out infinite;
+}
 }
 .hero-title {
     font-family: 'Fraunces', serif; font-weight: 700; font-size: 2.85rem;
@@ -77,11 +87,16 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     font-family: 'Inter', sans-serif; font-size: 1rem; color: #A8AFC2;
     max-width: 660px; line-height: 1.55;
 }
+@keyframes fluir-linea {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
 .accent-line {
     width: 100%; height: 4px; margin: 1.3rem 0 1.7rem 0; border-radius: 999px;
-    background: linear-gradient(90deg, #EC4899 0%, #7C5CFC 45%, #3DDC84 100%);
+    background: linear-gradient(90deg, #38BDF8 0%, #0EA5B7 45%, #F59E0B 100%);
+    background-size: 200% 100%;
+    animation: fluir-linea 6s linear infinite;
 }
-
 /* ---------- Section headers ---------- */
 .section-eyebrow {
     font-family: 'JetBrains Mono', monospace; font-weight: 600; letter-spacing: .1em;
@@ -106,6 +121,9 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     border-top: 3px solid var(--gauge-accent, #7C5CFC);
     border-radius: 14px; padding: 1.15rem 1.25rem 1.3rem 1.25rem;
     margin-bottom: .9rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.gauge-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
 }
 .gauge-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.3rem; }
 .gauge-name { font-family:'Fraunces', serif; font-weight:600; font-size:1.1rem; color:#FFFFFF; }
@@ -270,8 +288,7 @@ components.html(
     width=0,
 )
 
-ACENTO_POR_INDICE = [ACENTO_ROSA, ACENTO_VIOLETA, ACENTO_VERDE, ACENTO_CELESTE]
-
+ACENTO_POR_INDICE = [ACENTO_RIO_CLARO, ACENTO_RIO_MEDIO, ACENTO_ALERTA, ACENTO_CRITICO]
 
 # ---------------------------------------------------------------------
 # BARRA DE UMBRALES: el elemento visual que separa nivel actual de
