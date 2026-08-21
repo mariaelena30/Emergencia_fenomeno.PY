@@ -46,6 +46,58 @@ ACENTO_RIO_MEDIO = "#0EA5B7"
 ACENTO_ALERTA = "#F59E0B"
 ACENTO_CRITICO = "#F43F5E"
 
+# ---------------------------------------------------------------------
+# Confirmado contra tu main.py real (cuencas: parana, paraguay, bermejo,
+# pilcomayo). El orden de localidades ya NO se hardcodea a mano — se
+# calcula dinámicamente usando el campo "cuenca_clave" que ya viene en
+# cada localidad del backend, así nunca queda desactualizado.
+# ---------------------------------------------------------------------
+ORDEN_CUENCAS_PRIORIDAD = ["parana", "paraguay", "bermejo", "pilcomayo"]
+
+# Color FIJO por cuenca (no rota por posición): así la tarjeta de
+# Paraná siempre es la misma, sin importar en qué orden se dibuje.
+ACENTO_POR_CUENCA = {
+    "parana": "#2DD4BF",     # verde-azulado, cuenca prioritaria
+    "paraguay": "#38BDF8",   # celeste
+    "bermejo": "#A78BFA",    # violeta
+    "pilcomayo": "#FB923C",  # naranja
+}
+ACENTO_CUENCA_DEFAULT = "#7C5CFC"
+
+
+def ordenar_por_prioridad(diccionario: dict, orden_claves: list) -> dict:
+    """
+    Devuelve una copia de `diccionario` reordenada según `orden_claves`.
+    Las claves que no aparecen en `orden_claves` quedan al final,
+    respetando su orden original.
+    """
+    ordenado = {}
+    for clave in orden_claves:
+        if clave in diccionario:
+            ordenado[clave] = diccionario[clave]
+    for clave, valor in diccionario.items():
+        if clave not in ordenado:
+            ordenado[clave] = valor
+    return ordenado
+
+
+def ordenar_localidades_por_cuenca(localidades_dict: dict, orden_cuencas: list) -> dict:
+    """
+    Ordena las localidades usando su propio campo "cuenca_clave"
+    (viene del backend), en vez de una lista de nombres a mano.
+    Dentro de una misma cuenca, mantiene el orden original (sort
+    estable) y las localidades sin cuenca_clave reconocida van al final.
+    """
+    def prioridad(item):
+        _, loc = item
+        cuenca = loc.get("cuenca_clave")
+        try:
+            return orden_cuencas.index(cuenca)
+        except ValueError:
+            return len(orden_cuencas)
+
+    return dict(sorted(localidades_dict.items(), key=prioridad))
+
 CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
@@ -457,9 +509,9 @@ if datos_cuencas is None:
     )
     st.stop()
 
-cuencas = datos_cuencas["cuencas"]
+cuencas = ordenar_por_prioridad(datos_cuencas["cuencas"], ORDEN_CUENCAS_PRIORIDAD)
 explicaciones = datos_cuencas["explicaciones"]
-localidades = datos_localidades["localidades"]
+localidades = ordenar_localidades_por_cuenca(datos_localidades["localidades"], ORDEN_CUENCAS_PRIORIDAD)
 mes_actual = datetime.now().month
 
 con_conexion = sum(1 for c in cuencas.values() if c["conectado"])
@@ -525,6 +577,46 @@ no un pronóstico oficial.
 """
         )
 
+# ---------------------------------------------------------------------
+# PENDIENTES DEL PROYECTO
+#
+# Esto es contenido estático (hardcodeado acá, no viene del backend)
+# porque es información del roadmap del proyecto, no un dato de
+# monitoreo. Actualizalo a mano cuando se resuelva o sume un pendiente.
+# ---------------------------------------------------------------------
+PENDIENTES = [
+    {"item": "Integración WhatsApp Cloud API", "estado": "Bloqueado", "detalle": "Esperando verificación del número en Meta."},
+    {"item": "Migración a base de datos persistente (Supabase)", "estado": "En progreso", "detalle": "Reemplaza el almacenamiento en archivo, que se pierde al reiniciar Render."},
+    {"item": "Deploy de notificar_cambios.py", "estado": "Pendiente", "detalle": "Falta configurar el secret TFG_BOT_TOKEN en GitHub Actions."},
+    {"item": "Modo append en el pipeline de GitHub Actions", "estado": "Pendiente", "detalle": "Necesario para que calcular_tendencia.py tenga histórico real."},
+    {"item": "Modelo de inundación en QGIS", "estado": "Pendiente", "detalle": "Modelo de bañera (bathtub) usando DEM de SRTM."},
+    {"item": "ID del grupo de Telegram de emergencias", "estado": "Pendiente", "detalle": "Falta obtener ID_CHAT_EMERGENCIAS para las alertas automáticas."},
+]
+
+ESTADO_PENDIENTE_COLOR = {
+    "Bloqueado": "#F43F5E",
+    "En progreso": "#F59E0B",
+    "Pendiente": "#7A8296",
+}
+
+with st.expander(f"🛠️ Pendientes del proyecto ({len(PENDIENTES)})", expanded=False):
+    for p in PENDIENTES:
+        color = ESTADO_PENDIENTE_COLOR.get(p["estado"], "#7A8296")
+        st.markdown(
+            f"""
+            <div style="display:flex; align-items:baseline; gap:.6rem; margin-bottom:.7rem;">
+              <span style="background:{color}; color:#090D1A; font-weight:700; font-size:.62rem;
+                    text-transform:uppercase; letter-spacing:.05em; padding:.15rem .55rem;
+                    border-radius:999px; white-space:nowrap;">{p['estado']}</span>
+              <div>
+                <div style="color:#F5F6FA; font-weight:600; font-size:.88rem;">{p['item']}</div>
+                <div style="color:#8890A6; font-size:.78rem;">{p['detalle']}</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
 st.markdown("---")
 
 # ---------------------------------------------------------------------
@@ -538,11 +630,12 @@ st.markdown(
 cols = st.columns(4)
 for i, (col, (clave, c)) in enumerate(zip(cols, cuencas.items())):
     with col:
+        acento_cuenca = ACENTO_POR_CUENCA.get(clave, ACENTO_CUENCA_DEFAULT)
         st.markdown(
             gauge_html(
                 c["nombre"], c["estacion"], c["nivel_metros"], c["umbral_alerta"],
                 c["umbral_evacuacion"], c["estado"], c["fuente"], c["conectado"],
-                c["ultima_verificacion"], ACENTO_POR_INDICE[i % len(ACENTO_POR_INDICE)],
+                c["ultima_verificacion"], acento_cuenca,
             ),
             unsafe_allow_html=True,
         )
@@ -651,61 +744,116 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-for clave, loc in localidades.items():
-    aviso = "" if loc["conectado"] else " · ⚠️ dato de referencia"
-    with st.expander(f"{loc['emoji']} {loc['nombre']} — {loc['estado']}{aviso}"):
-        estilo = COLOR_ESTADO.get(loc["estado"], COLOR_ESTADO["NORMAL"])
-        precip = loc.get("precipitacion_acumulada_mm")
+# -----------------------------------------------------------------
+# CARRUSEL: antes se listaban las 12 localidades una debajo de la
+# otra (muy largo para scrollear, sobre todo en celular). Ahora se
+# muestra una por vez, con botones Anterior/Siguiente y un salto
+# directo por nombre. El orden respeta ORDEN_CUENCAS_PRIORIDAD via
+# cuenca_clave (Paraná primero), así que "Siguiente" recorre en ese orden.
+# -----------------------------------------------------------------
+lista_localidades = list(localidades.items())
+total_loc = len(lista_localidades)
 
-        # Valor grande del nivel actual + badge de estado
-        st.markdown(
-            f"""
-            <div class="gauge-value-row" style="margin-top:.2rem;">
-              <span class="gauge-value">{loc['nivel_metros']}</span>
-              <span class="gauge-value-unit">metros — nivel actual</span>
-              <span class="gauge-badge" style="background:{estilo['hex']}; margin-left:.6rem;">{estilo['label']}</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+if "loc_index" not in st.session_state:
+    st.session_state.loc_index = 0
+# Por si el backend devuelve menos localidades que antes
+st.session_state.loc_index = st.session_state.loc_index % total_loc
 
-        # Barra visual que separa nivel actual de los umbrales
-        st.markdown(barra_umbral_html(loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"]), unsafe_allow_html=True)
+nombres_localidades = [loc["nombre"] for _, loc in lista_localidades]
 
-        # Metadata en chips, separada del nivel/umbrales
-        precip_txt = f"{precip:.0f} mm" if precip is not None else "Sin dato"
-        conectado_txt = "Sí, en vivo" if loc["conectado"] else "No, dato de referencia"
-        st.markdown(
-            f"""
-            <div class="meta-grid">
-              <div class="meta-chip">
-                <div class="meta-chip-label">Precipitación acumulada</div>
-                <div class="meta-chip-value">{precip_txt}</div>
-              </div>
-              <div class="meta-chip">
-                <div class="meta-chip-label">Conectado en vivo</div>
-                <div class="meta-chip-value">{conectado_txt}</div>
-              </div>
-              <div class="meta-chip">
-                <div class="meta-chip-label">Última verificación</div>
-                <div class="meta-chip-value">{loc['ultima_verificacion']}</div>
-              </div>
-              <div class="meta-chip">
-                <div class="meta-chip-label">Fuente</div>
-                <div class="meta-chip-value">{loc['fuente']}</div>
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+col_select, col_prev, col_pos, col_next = st.columns([5, 1, 1.4, 1])
+with col_select:
+    seleccion = st.selectbox(
+        "Ir directo a una localidad",
+        nombres_localidades,
+        index=st.session_state.loc_index,
+        key="loc_select",
+        label_visibility="collapsed",
+    )
+    indice_seleccion = nombres_localidades.index(seleccion)
+    if indice_seleccion != st.session_state.loc_index:
+        st.session_state.loc_index = indice_seleccion
+with col_prev:
+    if st.button("◀", key="loc_prev", use_container_width=True):
+        st.session_state.loc_index = (st.session_state.loc_index - 1) % total_loc
+        st.rerun()
+with col_pos:
+    st.markdown(
+        f"<div style='text-align:center; padding-top:.5rem; color:#7A8296; "
+        f"font-family:JetBrains Mono, monospace; font-size:.78rem;'>"
+        f"{st.session_state.loc_index + 1} / {total_loc}</div>",
+        unsafe_allow_html=True,
+    )
+with col_next:
+    if st.button("▶", key="loc_next", use_container_width=True):
+        st.session_state.loc_index = (st.session_state.loc_index + 1) % total_loc
+        st.rerun()
 
-        st.markdown('<div class="analisis-label">📊 Análisis</div>', unsafe_allow_html=True)
-        st.markdown(
-            analizar(
-                loc["nombre"], loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"],
-                loc["estado"], fase_oni_actual, mes_actual, loc.get("precipitacion_acumulada_mm"),
-            )
-        )
+clave, loc = lista_localidades[st.session_state.loc_index]
+aviso = "" if loc["conectado"] else " · ⚠️ dato de referencia"
+estilo = COLOR_ESTADO.get(loc["estado"], COLOR_ESTADO["NORMAL"])
+precip = loc.get("precipitacion_acumulada_mm")
+
+st.markdown(
+    f"""
+    <div class="gauge-card" style="--gauge-accent:{estilo['hex']}; margin-top:.8rem;">
+      <div class="gauge-top">
+        <span class="gauge-name">{loc['emoji']} {loc['nombre']}{aviso}</span>
+        <span class="gauge-badge" style="background:{estilo['hex']}">{estilo['label']}</span>
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# Valor grande del nivel actual + badge de estado
+st.markdown(
+    f"""
+    <div class="gauge-value-row" style="margin-top:.7rem;">
+      <span class="gauge-value">{loc['nivel_metros']}</span>
+      <span class="gauge-value-unit">metros — nivel actual</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# Barra visual que separa nivel actual de los umbrales
+st.markdown(barra_umbral_html(loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"]), unsafe_allow_html=True)
+
+# Metadata en chips, separada del nivel/umbrales
+precip_txt = f"{precip:.0f} mm" if precip is not None else "Sin dato"
+conectado_txt = "Sí, en vivo" if loc["conectado"] else "No, dato de referencia"
+st.markdown(
+    f"""
+    <div class="meta-grid">
+      <div class="meta-chip">
+        <div class="meta-chip-label">Precipitación acumulada</div>
+        <div class="meta-chip-value">{precip_txt}</div>
+      </div>
+      <div class="meta-chip">
+        <div class="meta-chip-label">Conectado en vivo</div>
+        <div class="meta-chip-value">{conectado_txt}</div>
+      </div>
+      <div class="meta-chip">
+        <div class="meta-chip-label">Última verificación</div>
+        <div class="meta-chip-value">{loc['ultima_verificacion']}</div>
+      </div>
+      <div class="meta-chip">
+        <div class="meta-chip-label">Fuente</div>
+        <div class="meta-chip-value">{loc['fuente']}</div>
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown('<div class="analisis-label">📊 Análisis</div>', unsafe_allow_html=True)
+st.markdown(
+    analizar(
+        loc["nombre"], loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"],
+        loc["estado"], fase_oni_actual, mes_actual, loc.get("precipitacion_acumulada_mm"),
+    )
+)
 
 st.markdown(
     '<div class="footer-note">Este portal y el bot de Telegram @cuencas_chaco_bot '
