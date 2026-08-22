@@ -292,6 +292,17 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     padding:.12rem .5rem; border-radius:999px; color:#090D1A; flex-shrink:0;
 }
 
+/* ---------- Tickets SOS y reportes ciudadanos ---------- */
+.ticket-card {
+    background: #10152A; border: 1px solid rgba(255,255,255,0.07);
+    border-left: 3px solid var(--ticket-accent, #FF4D6D);
+    border-radius: 10px; padding: .75rem .9rem; margin-bottom: .6rem;
+}
+.ticket-card-top { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; margin-bottom:.35rem; }
+.ticket-card-nombre { font-weight:600; font-size:.88rem; color:#FFFFFF; }
+.ticket-card-meta { font-size:.74rem; color:#9BA3BD; margin-bottom:.4rem; }
+.ticket-card-detalle { font-size:.8rem; color:#D3D7E8; line-height:1.4; }
+
 /* ---------- Gauge card (resumen de cuenca) ---------- */
 .gauge-card {
     background: #10152A;
@@ -837,6 +848,208 @@ with st.expander(f"🛠️ Pendientes del proyecto ({len(PENDIENTES)})", expande
             f'</div>',
             unsafe_allow_html=True,
         )
+
+# ---------------------------------------------------------------------
+# SOS Y REPORTE CIUDADANO (Prioridad 1 del roadmap)
+#
+# Sin captura de GPS de un tap todavia (necesitaria un componente JS
+# aparte, no probado en este entorno) - se usa la coordenada del centro
+# de la localidad elegida como ubicacion por defecto, con un campo
+# opcional para pegar coordenadas exactas (ej. copiadas de Google Maps).
+# ---------------------------------------------------------------------
+NIVEL_AGUA_OPCIONES = {
+    "CORDON": "Hasta el cordón de la vereda",
+    "TOBILLO": "A la altura del tobillo",
+    "RODILLA": "A la altura de la rodilla",
+    "CINTURA": "A la altura de la cintura",
+    "ENTRO_A_CASA": "Entró a la vivienda",
+}
+
+REQUIERE_OPCIONES = {
+    "CAMION_4X4": "Vehículo 4x4",
+    "LANCHA": "Lancha / bote",
+    "ASISTENCIA_MEDICA": "Asistencia médica",
+    "EVACUACION": "Evacuación",
+    "ALIMENTOS_AGUA": "Alimentos / agua potable",
+}
+
+
+def enviar_al_backend(ruta: str, payload: dict):
+    try:
+        r = requests.post(f"{BACKEND_URL}{ruta}", json=payload, timeout=10.0)
+        r.raise_for_status()
+        return r.json(), None
+    except Exception as e:
+        return None, str(e)
+
+
+@st.cache_data(ttl=20)
+def cargar_tickets_sos():
+    try:
+        r = requests.get(f"{BACKEND_URL}/sos", timeout=8.0)
+        r.raise_for_status()
+        return r.json().get("tickets", [])
+    except Exception:
+        return []
+
+
+@st.cache_data(ttl=20)
+def cargar_reportes_ciudadanos():
+    try:
+        r = requests.get(f"{BACKEND_URL}/reportes", timeout=8.0)
+        r.raise_for_status()
+        return r.json().get("reportes", [])
+    except Exception:
+        return []
+
+
+st.markdown(
+    '<div class="section-eyebrow">Emergencias</div>'
+    '<div class="section-title">🆘 Pedir ayuda y reportar</div>',
+    unsafe_allow_html=True,
+)
+
+tab_sos, tab_reporte, tab_activos = st.tabs(["🆘 Pedir ayuda (SOS)", "📸 Reportar anegamiento", "📋 Solicitudes activas"])
+
+with tab_sos:
+    st.caption(
+        "Para emergencias con riesgo de vida, llamá primero a Defensa Civil (103) o Bomberos (100). "
+        "Este formulario avisa al sistema, pero no reemplaza la llamada telefónica."
+    )
+    with st.form("form_sos", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            nombre_sos = st.text_input("Nombre y apellido *")
+            telefono_sos = st.text_input("Teléfono de contacto *")
+            localidad_sos = st.selectbox(
+                "Localidad *", options=list(localidades.keys()),
+                format_func=lambda k: localidades[k]["nombre"], key="loc_sos",
+            )
+            direccion_sos = st.text_input("Dirección (calle y altura)")
+        with col2:
+            personas_sos = st.number_input("Personas afectadas", min_value=1, value=1, step=1)
+            altura_agua_sos = st.number_input("Altura del agua en la vivienda (cm)", min_value=0, value=0, step=5)
+            urgencia_sos = st.selectbox("Nivel de urgencia", ["ALTO", "MEDIO", "BAJO"], index=0)
+            requiere_sos = st.multiselect(
+                "¿Qué necesitás?", options=list(REQUIERE_OPCIONES.keys()),
+                format_func=lambda k: REQUIERE_OPCIONES[k],
+            )
+        notas_sos = st.text_area("Notas adicionales (puntos de referencia, personas vulnerables, etc.)")
+        coords_manual_sos = st.text_input(
+            "Coordenadas exactas (opcional) — pegá 'lat, lon' desde Google Maps si las tenés",
+            placeholder="ej: -27.4815, -58.9324",
+        )
+        enviar_sos = st.form_submit_button("🆘 Enviar solicitud de ayuda", use_container_width=True)
+
+        if enviar_sos:
+            if not nombre_sos or not telefono_sos:
+                st.error("Nombre y teléfono son obligatorios.")
+            else:
+                lat_sos, lon_sos = COORDENADAS.get(localidad_sos, (-26.5, -59.5))
+                if coords_manual_sos.strip():
+                    try:
+                        partes = [p.strip() for p in coords_manual_sos.split(",")]
+                        lat_sos, lon_sos = float(partes[0]), float(partes[1])
+                    except (ValueError, IndexError):
+                        st.warning("No pude leer esas coordenadas, uso la ubicación de la localidad en su lugar.")
+                resultado, error = enviar_al_backend("/sos", {
+                    "nombre": nombre_sos, "telefono": telefono_sos, "localidad": localidad_sos,
+                    "direccion": direccion_sos or None, "lat": lat_sos, "lon": lon_sos,
+                    "personas_afectadas": int(personas_sos),
+                    "altura_agua_cm": int(altura_agua_sos) if altura_agua_sos else None,
+                    "nivel_urgencia": urgencia_sos, "requiere": requiere_sos, "notas": notas_sos or None,
+                })
+                if error:
+                    st.error(f"No se pudo enviar la solicitud ({error}). Si es urgente, llamá directamente a Defensa Civil.")
+                else:
+                    st.success(f"Solicitud enviada (ticket {resultado['ticket']['id']}). Defensa Civil fue notificada.")
+                    cargar_tickets_sos.clear()
+
+with tab_reporte:
+    st.caption("Tu reporte ayuda a alertar a los vecinos y guiar a las cuadrillas, aunque no sea una emergencia con riesgo de vida.")
+    with st.form("form_reporte", clear_on_submit=True):
+        nombre_rep = st.text_input("Nombre (opcional)")
+        col1, col2 = st.columns(2)
+        with col1:
+            localidad_rep = st.selectbox(
+                "Localidad *", options=list(localidades.keys()),
+                format_func=lambda k: localidades[k]["nombre"], key="loc_reporte",
+            )
+            calle_rep = st.text_input("Calle / punto de referencia *")
+        with col2:
+            nivel_agua_rep = st.selectbox(
+                "Nivel de agua aproximado", options=list(NIVEL_AGUA_OPCIONES.keys()),
+                format_func=lambda k: NIVEL_AGUA_OPCIONES[k],
+            )
+        descripcion_rep = st.text_area("Descripción del anegamiento")
+        st.caption("📷 Subida de foto todavía no disponible — se suma cuando esté lista la base de datos persistente (Supabase).")
+        enviar_rep = st.form_submit_button("📸 Enviar reporte", use_container_width=True)
+
+        if enviar_rep:
+            if not calle_rep:
+                st.error("La calle o punto de referencia es obligatorio.")
+            else:
+                lat_rep, lon_rep = COORDENADAS.get(localidad_rep, (-26.5, -59.5))
+                resultado, error = enviar_al_backend("/reportes", {
+                    "nombre": nombre_rep or "Anónimo", "localidad": localidad_rep, "calle": calle_rep,
+                    "lat": lat_rep, "lon": lon_rep, "nivel_agua_aprox": nivel_agua_rep,
+                    "descripcion": descripcion_rep or None,
+                })
+                if error:
+                    st.error(f"No se pudo enviar el reporte ({error}).")
+                else:
+                    st.success(f"Reporte enviado (id {resultado['reporte']['id']}). ¡Gracias por avisar!")
+                    cargar_reportes_ciudadanos.clear()
+
+with tab_activos:
+    tickets = cargar_tickets_sos()
+    reportes = cargar_reportes_ciudadanos()
+
+    if st.button("🔄 Actualizar"):
+        cargar_tickets_sos.clear()
+        cargar_reportes_ciudadanos.clear()
+        st.rerun()
+
+    st.markdown("**Tickets SOS**")
+    if not tickets:
+        st.caption("Sin solicitudes de ayuda registradas.")
+    else:
+        color_urgencia = {"ALTO": "#FF4D6D", "MEDIO": "#FFC93C", "BAJO": "#3DDC84"}
+        for t in tickets[:15]:
+            color = color_urgencia.get(t.get("nivel_urgencia"), "#7A8296")
+            nombre_loc = localidades.get(t["localidad"], {}).get("nombre", t["localidad"])
+            st.markdown(
+                f'<div class="ticket-card" style="--ticket-accent:{color}">'
+                f'<div class="ticket-card-top">'
+                f'<span class="ticket-card-nombre">{t["nombre"]}</span>'
+                f'<span class="alertas-item-badge" style="background:{color}">{t["estado"]}</span>'
+                f'</div>'
+                f'<div class="ticket-card-meta">{nombre_loc} · {t["timestamp"]} · Urgencia: {t["nivel_urgencia"]}</div>'
+                f'<div class="ticket-card-detalle">{t.get("personas_afectadas", 1)} persona(s)'
+                f'{" · agua a " + str(t["altura_agua_cm"]) + " cm" if t.get("altura_agua_cm") else ""}'
+                f'{" · " + t["notas"] if t.get("notas") else ""}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("**Reportes ciudadanos**")
+    if not reportes:
+        st.caption("Sin reportes ciudadanos registrados.")
+    else:
+        for r in reportes[:15]:
+            nombre_loc = localidades.get(r["localidad"], {}).get("nombre", r["localidad"])
+            st.markdown(
+                f'<div class="ticket-card" style="--ticket-accent:#38BDF8">'
+                f'<div class="ticket-card-top">'
+                f'<span class="ticket-card-nombre">{r["calle"]}</span>'
+                f'</div>'
+                f'<div class="ticket-card-meta">{nombre_loc} · {r["timestamp"]} · {NIVEL_AGUA_OPCIONES.get(r["nivel_agua_aprox"], r["nivel_agua_aprox"])}</div>'
+                f'<div class="ticket-card-detalle">{r.get("descripcion") or "Sin descripción adicional."} — reportado por {r["nombre"]}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+st.markdown("---")
 
 # ---------------------------------------------------------------------
 # GAUGES DE LAS 4 CUENCAS
