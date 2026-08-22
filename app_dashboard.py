@@ -320,6 +320,27 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
 }
 .loc-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
 
+/* ---------- Tarjetas chicas de barrios vulnerables ---------- */
+.barrio-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: .7rem; margin: 1rem 0 .5rem 0;
+}
+.barrio-card {
+    background: #10152A; border: 1px solid rgba(255,255,255,0.07);
+    border-left: 3px solid var(--barrio-accent, #7C5CFC);
+    border-radius: 10px; padding: .75rem .85rem;
+}
+.barrio-card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:.4rem; margin-bottom:.3rem; }
+.barrio-card-nombre { font-family:'Fraunces', serif; font-weight:600; font-size:.92rem; color:#FFFFFF; line-height:1.25; }
+.barrio-card-badge {
+    font-family:'Inter', sans-serif; font-weight:700; font-size:.58rem; letter-spacing:.05em;
+    text-transform: uppercase; padding: .12rem .45rem; border-radius: 999px; color:#090D1A;
+    white-space: nowrap; flex-shrink: 0;
+}
+.barrio-card-padre { font-size:.72rem; color:#7A8296; margin-bottom:.4rem; }
+.barrio-card-motivo { font-size:.76rem; color:#B8BED1; line-height:1.4; }
+.barrio-card-aprox { font-size:.66rem; color:#F59E0B; margin-top:.35rem; }
+
 .footer-note { font-size:.76rem; color:#565D75; text-align:center; padding: 1.4rem 0 .6rem 0; }
 
 hr { border-color: rgba(255,255,255,0.08) !important; }
@@ -688,6 +709,73 @@ with st.expander(f"🛠️ Pendientes del proyecto ({len(PENDIENTES)})", expande
             unsafe_allow_html=True,
         )
 
+# ---------------------------------------------------------------------
+# ROADMAP — PRIORIDAD 3 (propuestas nuevas, no deuda tecnica)
+#
+# Del documento "Portal Hidrico Chaco - Roadmap de mejoras" (12/08/2026).
+# A diferencia de PENDIENTES (cosas que ya se decidieron hacer), esto es
+# el banco de propuestas de "si hay tiempo/recursos" - se muestra
+# separado para no mezclar roadmap especulativo con deuda tecnica real.
+# ---------------------------------------------------------------------
+ROADMAP_PRIORIDAD_3 = [
+    {
+        "propuesta": "Bot de WhatsApp (espejo del de Telegram)",
+        "descripcion": "Amplía el alcance en zonas rurales (El Sauzalito, Fuerte Esperanza) donde Telegram tiene poca penetración.",
+        "esfuerzo": "Alto", "impacto": "Alto",
+    },
+    {
+        "propuesta": "Vista operativa para personal (Bomberos/Defensa Civil)",
+        "descripcion": "Panel separado del público, con capas de recursos (móviles, brigadas, insumos) sobre las zonas de riesgo.",
+        "esfuerzo": "Alto", "impacto": "Medio-alto",
+    },
+    {
+        "propuesta": "Modo offline / alertas por SMS",
+        "descripcion": "Fallback por SMS (Twilio u otro) para el personal en campo cuando falla el 4G.",
+        "esfuerzo": "Alto", "impacto": "Medio",
+    },
+    {
+        "propuesta": "Comparación con crecidas históricas",
+        "descripcion": "Matching simple del patrón actual contra eventos pasados registrados, para dar contexto humano a la alerta.",
+        "esfuerzo": "Medio", "impacto": "Medio",
+    },
+    {
+        "propuesta": "Panel de verificación humana pre-alerta",
+        "descripcion": "Las alertas automáticas pasan por revisión (vos o Defensa Civil) antes de salir al público, para evitar falsos positivos.",
+        "esfuerzo": "Bajo-medio", "impacto": "Medio",
+    },
+]
+
+# Mismo criterio de color en esfuerzo/impacto para que se lean rapido:
+# rojo = mas caro/mejor, ambar = medio, verde = mas barato/menor.
+COLOR_NIVEL = {
+    "Alto": "#F43F5E", "Medio-alto": "#F59E0B", "Medio": "#FFC93C",
+    "Bajo-medio": "#3DDC84", "Bajo": "#2ED573",
+}
+
+with st.expander(f"🗺️ Roadmap — Prioridad 3, si hay tiempo/recursos ({len(ROADMAP_PRIORIDAD_3)})", expanded=False):
+    st.caption("Propuestas del documento de roadmap, todavía no iniciadas. Ordenadas como en el documento original.")
+    for r in ROADMAP_PRIORIDAD_3:
+        color_esfuerzo = COLOR_NIVEL.get(r["esfuerzo"], "#7A8296")
+        color_impacto = COLOR_NIVEL.get(r["impacto"], "#7A8296")
+        st.markdown(
+            f"""
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
+                        border-radius:10px; padding:.75rem .9rem; margin-bottom:.6rem;">
+              <div style="color:#F5F6FA; font-weight:600; font-size:.9rem; margin-bottom:.3rem;">{r['propuesta']}</div>
+              <div style="color:#B8BED1; font-size:.8rem; line-height:1.4; margin-bottom:.5rem;">{r['descripcion']}</div>
+              <div style="display:flex; gap:.5rem;">
+                <span style="background:{color_esfuerzo}; color:#090D1A; font-weight:700; font-size:.6rem;
+                      text-transform:uppercase; letter-spacing:.04em; padding:.12rem .5rem; border-radius:999px;">
+                      Esfuerzo: {r['esfuerzo']}</span>
+                <span style="background:{color_impacto}; color:#090D1A; font-weight:700; font-size:.6rem;
+                      text-transform:uppercase; letter-spacing:.04em; padding:.12rem .5rem; border-radius:999px;">
+                      Impacto: {r['impacto']}</span>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
 st.markdown("---")
 
 # ---------------------------------------------------------------------
@@ -801,12 +889,28 @@ if datos_barrios:
         "pasadas (1982, 1998, 2014, 2023), sufren antes y peor que el resto de la "
         "ciudad — no tienen medición propia, comparten el estado de su localidad."
     )
+
+    tarjetas_barrios = ""
     for clave, b in datos_barrios.items():
         estilo_b = COLOR_ESTADO.get(b["estado"], COLOR_ESTADO["NORMAL"])
-        aviso_precision = "" if b["precision"] == "confirmada" else " · 📍 ubicación aproximada"
-        with st.expander(f"{b['emoji']} {b['nombre']} — dentro de {b.get('nombre_localidad_padre', b['localidad_padre'])}{aviso_precision}"):
-            st.markdown(f"**Por qué es vulnerable:** {b['motivo']}")
-            st.markdown(f"**Estado actual (heredado de su localidad):** {b['estado']}")
+        es_aproximada = b["precision"] != "confirmada"
+        aviso_precision = (
+            f'<div class="barrio-card-aprox">📍 ubicación aproximada</div>' if es_aproximada else ""
+        )
+        nombre_padre = b.get("nombre_localidad_padre", b["localidad_padre"])
+        tarjetas_barrios += f"""
+        <div class="barrio-card" style="--barrio-accent:{estilo_b['hex']}">
+          <div class="barrio-card-top">
+            <span class="barrio-card-nombre">{b['emoji']} {b['nombre']}</span>
+            <span class="barrio-card-badge" style="background:{estilo_b['hex']}">{estilo_b['label']}</span>
+          </div>
+          <div class="barrio-card-padre">Dentro de {nombre_padre}</div>
+          <div class="barrio-card-motivo">{b['motivo']}</div>
+          {aviso_precision}
+        </div>
+        """
+
+    st.markdown(f'<div class="barrio-grid">{tarjetas_barrios}</div>', unsafe_allow_html=True)
 
 st.markdown("---")
 st.markdown(
@@ -834,16 +938,22 @@ nombres_localidades = [loc["nombre"] for _, loc in lista_localidades]
 
 col_select, col_prev, col_pos, col_next = st.columns([5, 1, 1.4, 1])
 with col_select:
+    # La key incluye el indice actual a proposito: asi Streamlit trata
+    # el selectbox como un widget NUEVO cada vez que cambia loc_index
+    # (por los botones prev/next), y usa el "index=" de abajo en vez
+    # de pisarlo con un valor previo guardado bajo la key vieja - eso
+    # era lo que hacia que "1 / 12" pareciera no moverse.
     seleccion = st.selectbox(
         "Ir directo a una localidad",
         nombres_localidades,
         index=st.session_state.loc_index,
-        key="loc_select",
+        key=f"loc_select_{st.session_state.loc_index}",
         label_visibility="collapsed",
     )
     indice_seleccion = nombres_localidades.index(seleccion)
     if indice_seleccion != st.session_state.loc_index:
         st.session_state.loc_index = indice_seleccion
+        st.rerun()
 with col_prev:
     if st.button("◀", key="loc_prev", use_container_width=True):
         st.session_state.loc_index = (st.session_state.loc_index - 1) % total_loc
