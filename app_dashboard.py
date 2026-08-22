@@ -11,6 +11,7 @@ Backend: https://github.com/mariaelena30/cuencas-bot (main.py)
 import streamlit as st
 import requests
 import folium
+import pandas as pd
 from streamlit_folium import st_folium
 from datetime import datetime
 
@@ -63,6 +64,76 @@ ACENTO_POR_CUENCA = {
     "pilcomayo": "#FB923C",  # naranja
 }
 ACENTO_CUENCA_DEFAULT = "#7C5CFC"
+
+# ---------------------------------------------------------------------
+# GRAFICO DE TENDENCIA HISTORICA
+#
+# El pipeline de niveles_rios.json usa nombres de ESTACION (Barranqueras,
+# Corrientes, Formosa...) que no son 1 a 1 con las 12 localidades. Este
+# mapeo conecta cada localidad con la estacion que mejor la representa
+# (mismo tramo de rio). Las localidades que no tienen ninguna estacion
+# con historico disponible (interior chaqueño, sin cobertura CIM-UNL)
+# simplemente no aparecen aca, y el dashboard lo indica con claridad
+# en vez de mostrar un grafico vacio o inventado.
+# ---------------------------------------------------------------------
+ESTACION_HISTORICO_POR_LOCALIDAD = {
+    "resistencia": "Barranqueras",       # mismo tramo, ~8km
+    "barranqueras": "Barranqueras",      # medicion directa
+    "puerto_vilelas": "Barranqueras",    # mismo tramo, ~5km
+    "corrientes": "Corrientes",          # medicion directa
+    "formosa": "Formosa",                # medicion directa
+    "puerto_bermejo": "Bermejo",         # zona de confluencia, aproximado
+}
+
+
+@st.cache_data(ttl=300)
+def cargar_historico(estacion: str, dias: int = 60):
+    try:
+        r = requests.get(f"{BACKEND_URL}/historico/{estacion}", params={"dias": dias}, timeout=8.0)
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return {"estacion": estacion, "lecturas": [], "n_lecturas": 0}
+
+
+def mostrar_grafico_tendencia(clave_localidad: str, umbral_alerta: float, umbral_evacuacion: float):
+    """Grafico de linea con el historico de nivel + lineas de umbral, o un aviso claro si todavia no hay suficientes datos."""
+    estacion = ESTACION_HISTORICO_POR_LOCALIDAD.get(clave_localidad)
+
+    if estacion is None:
+        st.caption(
+            "📈 Esta localidad todavía no tiene una estación con histórico disponible "
+            "para graficar tendencia (sin cobertura del pipeline automático)."
+        )
+        return
+
+    datos = cargar_historico(estacion)
+    lecturas = datos.get("lecturas", [])
+
+    if len(lecturas) < 2:
+        st.caption(
+            f"📈 Recién empezó a acumularse el histórico de la estación {estacion} "
+            f"({len(lecturas)} lectura{'s' if len(lecturas) != 1 else ''} hasta ahora). "
+            "El gráfico de tendencia va a aparecer solo en cuanto haya un par de días de datos."
+        )
+        return
+
+    df = pd.DataFrame(lecturas)
+    df["fecha"] = pd.to_datetime(df["fecha"])
+    df = df.set_index("fecha")
+    df["Umbral de alerta"] = umbral_alerta
+    df["Umbral de evacuación"] = umbral_evacuacion
+    df = df.rename(columns={"altura_m": "Nivel (m)"})
+
+    st.markdown(
+        f'<div class="analisis-label" style="color:#38BDF8;">📈 Tendencia — estación {estacion}</div>',
+        unsafe_allow_html=True,
+    )
+    st.line_chart(
+        df[["Nivel (m)", "Umbral de alerta", "Umbral de evacuación"]],
+        color=["#38BDF8", "#FFC93C", "#FF4D6D"],
+        height=260,
+    )
 
 
 def ordenar_por_prioridad(diccionario: dict, orden_claves: list) -> dict:
@@ -819,6 +890,8 @@ st.markdown(
 
 # Barra visual que separa nivel actual de los umbrales
 st.markdown(barra_umbral_html(loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"]), unsafe_allow_html=True)
+
+mostrar_grafico_tendencia(clave, loc["umbral_alerta"], loc["umbral_evacuacion"])
 
 # Metadata en chips, separada del nivel/umbrales
 precip_txt = f"{precip:.0f} mm" if precip is not None else "Sin dato"
