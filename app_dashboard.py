@@ -58,12 +58,42 @@ ORDEN_CUENCAS_PRIORIDAD = ["parana", "paraguay", "bermejo", "pilcomayo"]
 # Color FIJO por cuenca (no rota por posición): así la tarjeta de
 # Paraná siempre es la misma, sin importar en qué orden se dibuje.
 ACENTO_POR_CUENCA = {
-    "parana": "#2DD4BF",     # verde-azulado, cuenca prioritaria
-    "paraguay": "#38BDF8",   # celeste
-    "bermejo": "#A78BFA",    # violeta
-    "pilcomayo": "#FB923C",  # naranja
+    "parana": "#38BDF8",     # celeste
+    "paraguay": "#0EA5B7",   # verde-azulado
+    "bermejo": "#F59E0B",    # ambar
+    "pilcomayo": "#10B981",  # verde
 }
 ACENTO_CUENCA_DEFAULT = "#7C5CFC"
+
+# ---------------------------------------------------------------------
+# DATOS MORFOMETRICOS DE CUENCA (area, coeficiente de Gravelius) y bbox
+# aproximado para dibujar el rectangulo de cada cuenca en el mapa.
+#
+# Extraidos de tu prototipo Monitoreo--main (chacoData.ts), que a su vez
+# los saco del trabajo de Gomez (2025) IIGHI-CONICET/UNNE mencionado en
+# tu roadmap. Kc (Gravelius) mas alto = cuenca mas alargada = modera el
+# pico de crecida pero la sostiene mas tiempo en vez de picos subitos.
+# bbox_aprox es una caja rectangular orientativa, NO el contorno real
+# de la cuenca (eso todavia esta pendiente en QGIS con el DEM de SRTM).
+# ---------------------------------------------------------------------
+CUENCA_MORFOMETRIA = {
+    "parana": {
+        "area_km2": 1_980_000.0, "gravelius": 2.85,
+        "bbox": {"lat_min": -28.0, "lat_max": -26.5, "lon_min": -59.5, "lon_max": -58.5},
+    },
+    "paraguay": {
+        "area_km2": 1_095_000.0, "gravelius": 2.65,
+        "bbox": {"lat_min": -27.3, "lat_max": -25.5, "lon_min": -59.2, "lon_max": -57.8},
+    },
+    "bermejo": {
+        "area_km2": 14_492.0, "gravelius": 2.98,
+        "bbox": {"lat_min": -27.0, "lat_max": -24.0, "lon_min": -62.5, "lon_max": -58.5},
+    },
+    "pilcomayo": {
+        "area_km2": 272_000.0, "gravelius": 2.45,
+        "bbox": {"lat_min": -24.8, "lat_max": -23.5, "lon_min": -62.8, "lon_max": -60.0},
+    },
+}
 
 # ---------------------------------------------------------------------
 # GRAFICO DE TENDENCIA HISTORICA
@@ -847,8 +877,46 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-mapa = folium.Map(location=[-26.5, -59.5], zoom_start=6, tiles="CartoDB dark_matter")
+mapa = folium.Map(
+    location=[-26.5, -59.5],
+    zoom_start=6,
+    # Antes: CartoDB dark_matter (plano, sin geografia visible). Ahora:
+    # CartoDB Voyager, que SI dibuja rios, lagos y relieve con tonos
+    # reales - resuelve tanto "se ve muy suelto" como "quiero ver los
+    # rios", sin inventar coordenadas de rio a mano (que en un sistema
+    # de alerta real puede ser peligroso si quedan mal ubicadas).
+    tiles="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    attr='&copy; <a href="https://carto.com/">CartoDB</a> &copy; OpenStreetMap',
+)
 
+# ---- 1. Rectangulos de cuenca (delimitacion aproximada, punteada) ----
+# bbox_aprox NO es el contorno real de la cuenca (eso esta pendiente en
+# QGIS con el DEM de SRTM) - es una caja orientativa, aclarado en el popup.
+for clave_cuenca, c in cuencas.items():
+    morfo = CUENCA_MORFOMETRIA.get(clave_cuenca)
+    if morfo is None:
+        continue
+    color_cuenca = ACENTO_POR_CUENCA.get(clave_cuenca, ACENTO_CUENCA_DEFAULT)
+    bbox = morfo["bbox"]
+    popup_cuenca = (
+        f"<b>{c['nombre']}</b><br>"
+        f"Área aprox.: {morfo['area_km2']:,.0f} km²<br>"
+        f"Coef. compacidad de Gravelius: {morfo['gravelius']}<br>"
+        f"<i>Caja orientativa, no el contorno real (pendiente en QGIS)</i>"
+    )
+    folium.Rectangle(
+        bounds=[[bbox["lat_min"], bbox["lon_min"]], [bbox["lat_max"], bbox["lon_max"]]],
+        color=color_cuenca,
+        weight=2,
+        dash_array="5, 8",
+        fill=True,
+        fill_color=color_cuenca,
+        fill_opacity=0.07,
+        popup=folium.Popup(popup_cuenca, max_width=260),
+        tooltip=c["nombre"],
+    ).add_to(mapa)
+
+# ---- 2. Localidades: punto redondo de color solido, borde blanco ----
 for clave, loc in localidades.items():
     if clave not in COORDENADAS:
         continue
@@ -865,38 +933,81 @@ for clave, loc in localidades.items():
         f"Fuente: {loc['fuente']}<br>"
         f"<i>{etiqueta_conexion}</i>"
     )
+    icono_localidad = folium.DivIcon(
+        html=(
+            f'<div style="background-color:{estilo["hex"]}; width:22px; height:22px; '
+            f'border-radius:50%; border:2px solid #FFFFFF; box-shadow:0 3px 6px rgba(0,0,0,0.4);"></div>'
+        ),
+        icon_size=(22, 22), icon_anchor=(11, 11),
+    )
     folium.Marker(
         location=[lat, lon],
         popup=folium.Popup(popup_html, max_width=280),
         tooltip=loc["nombre"],
-        icon=folium.Icon(color=estilo["folium"], icon="tint"),
+        icon=icono_localidad,
     ).add_to(mapa)
 
-# Barrios/zonas vulnerables: puntos mas chicos, DENTRO de su localidad,
-# con icono distinto (signo de exclamacion) para diferenciarlos de las
-# 12 localidades principales.
+# ---- 3. Barrios vulnerables: cuadrado ROJO fijo (delimitacion), sin
+# depender del estado actual - la vulnerabilidad historica es constante,
+# no cambia con el nivel del rio de hoy. Eso era justo lo que pediste:
+# marcarlas siempre en rojo para que se distingan de las localidades.
 for clave, b in datos_barrios.items():
-    estilo_b = COLOR_ESTADO.get(b["estado"], COLOR_ESTADO["NORMAL"])
     aviso_precision = "" if b["precision"] == "confirmada" else f" · ubicación {b['precision']}"
     popup_barrio = (
-        f"<b>📍 {b['nombre']}</b><br>"
-        f"<i>Zona vulnerable dentro de {b.get('nombre_localidad_padre', b['localidad_padre'])}</i><br><br>"
+        f"<b>⚠️ ZONA VULNERABLE — {b['nombre']}</b><br>"
+        f"<i>Dentro de {b.get('nombre_localidad_padre', b['localidad_padre'])}</i><br><br>"
         f"{b['motivo']}"
         f"{aviso_precision}"
     )
-    folium.CircleMarker(
+    icono_barrio = folium.DivIcon(
+        html=(
+            '<div style="background-color:#F43F5E; width:18px; height:18px; '
+            'border-radius:4px; border:2px solid #FFFFFF; box-shadow:0 3px 6px rgba(0,0,0,0.4); '
+            'display:flex; align-items:center; justify-content:center; color:#FFFFFF; '
+            'font-size:10px; font-weight:900;">▲</div>'
+        ),
+        icon_size=(18, 18), icon_anchor=(9, 9),
+    )
+    folium.Marker(
         location=[b["lat"], b["lon"]],
-        radius=7,
         popup=folium.Popup(popup_barrio, max_width=300),
         tooltip=f"⚠️ {b['nombre']}",
-        color="#FFFFFF",
-        weight=2,
-        fill=True,
-        fill_color=estilo_b["hex"],
-        fill_opacity=0.9,
+        icon=icono_barrio,
     ).add_to(mapa)
 
-st_folium(mapa, width=1100, height=500)
+# ---- 4. Leyenda flotante (esquina inferior derecha del mapa) ----
+leyenda_html = """
+<div style="position:absolute; bottom:14px; right:14px; z-index:1000;
+     background:rgba(9,13,26,0.92); border:1px solid rgba(56,189,248,0.35);
+     border-radius:10px; padding:.7rem .9rem; font-family:'Inter',sans-serif;
+     font-size:.7rem; color:#D3D7E8; max-width:210px; box-shadow:0 8px 20px rgba(0,0,0,0.4);">
+  <div style="font-weight:700; color:#FFFFFF; margin-bottom:.4rem; font-size:.68rem;
+       text-transform:uppercase; letter-spacing:.05em;">Referencias</div>
+  <div style="display:flex; align-items:center; gap:.4rem; margin-bottom:.3rem;">
+    <span style="width:10px; height:10px; border-radius:50%; background:#2ED573; display:inline-block; border:1px solid #fff;"></span>
+    Localidad — Normal
+  </div>
+  <div style="display:flex; align-items:center; gap:.4rem; margin-bottom:.3rem;">
+    <span style="width:10px; height:10px; border-radius:50%; background:#FFC93C; display:inline-block; border:1px solid #fff;"></span>
+    Localidad — Alerta
+  </div>
+  <div style="display:flex; align-items:center; gap:.4rem; margin-bottom:.3rem;">
+    <span style="width:10px; height:10px; border-radius:50%; background:#FF4D6D; display:inline-block; border:1px solid #fff;"></span>
+    Localidad — Evacuación
+  </div>
+  <div style="display:flex; align-items:center; gap:.4rem; margin-bottom:.3rem;">
+    <span style="width:10px; height:10px; border-radius:3px; background:#F43F5E; display:inline-block; border:1px solid #fff;"></span>
+    Zona vulnerable histórica
+  </div>
+  <div style="display:flex; align-items:center; gap:.4rem;">
+    <span style="width:14px; height:8px; border:1.5px dashed #7C5CFC; display:inline-block;"></span>
+    Cuenca (caja orientativa)
+  </div>
+</div>
+"""
+mapa.get_root().html.add_child(folium.Element(leyenda_html))
+
+st_folium(mapa, width=1100, height=520)
 
 chips = "".join(
     f'<span class="loc-chip"><span class="loc-dot" style="background:{COLOR_ESTADO.get(l["estado"], COLOR_ESTADO["NORMAL"])["hex"]}"></span>{l["nombre"]}</span>'
