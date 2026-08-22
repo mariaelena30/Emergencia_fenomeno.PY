@@ -710,13 +710,44 @@ with st.expander(f"🛠️ Pendientes del proyecto ({len(PENDIENTES)})", expande
         )
 
 # ---------------------------------------------------------------------
-# ROADMAP — PRIORIDAD 3 (propuestas nuevas, no deuda tecnica)
+# ROADMAP — PRIORIDADES 1, 2 y 3 (propuestas nuevas, no deuda tecnica)
 #
 # Del documento "Portal Hidrico Chaco - Roadmap de mejoras" (12/08/2026).
 # A diferencia de PENDIENTES (cosas que ya se decidieron hacer), esto es
-# el banco de propuestas de "si hay tiempo/recursos" - se muestra
-# separado para no mezclar roadmap especulativo con deuda tecnica real.
+# el banco de propuestas ordenadas por prioridad - se muestra separado
+# para no mezclar roadmap especulativo con deuda tecnica real.
 # ---------------------------------------------------------------------
+ROADMAP_PRIORIDAD_1 = [
+    {
+        "propuesta": 'Botón de "pedir ayuda" geolocalizado',
+        "descripcion": "Comando en el bot que capture ubicación GPS del usuario y la envíe directo a Defensa Civil/Bomberos ante una emergencia.",
+        "esfuerzo": "Medio", "impacto": "Muy alto",
+    },
+    {
+        "propuesta": "Reporte ciudadano en tiempo real",
+        "descripcion": "Comando /reportar: el usuario sube foto + ubicación de un anegamiento puntual. Genera datos que ningún sensor oficial capta.",
+        "esfuerzo": "Medio", "impacto": "Muy alto",
+    },
+]
+
+ROADMAP_PRIORIDAD_2 = [
+    {
+        "propuesta": "Mapa de refugios y rutas de evacuación",
+        "descripcion": "Capa en el dashboard con centros de evacuación y rutas que no se cortan con el agua, cruzada con el DEM de QGIS para marcar tramos riesgosos.",
+        "esfuerzo": "Medio", "impacto": "Alto",
+    },
+    {
+        "propuesta": "Índice compuesto de vulnerabilidad por barrio",
+        "descripcion": "Combina NDVI + pendiente (DEM) + distancia al río + capa BARRIOS_VULNERABLES en un solo puntaje por barrio.",
+        "esfuerzo": "Medio-alto", "impacto": "Alto",
+    },
+    {
+        "propuesta": "Umbral dinámico de alerta",
+        "descripcion": "En vez de umbral fijo, combinar acumulado de lluvia (24-72h) + nivel actual + tendencia (regresión simple) para estimar horas hasta desborde.",
+        "esfuerzo": "Medio-alto", "impacto": "Alto",
+    },
+]
+
 ROADMAP_PRIORIDAD_3 = [
     {
         "propuesta": "Bot de WhatsApp (espejo del de Telegram)",
@@ -748,13 +779,14 @@ ROADMAP_PRIORIDAD_3 = [
 # Mismo criterio de color en esfuerzo/impacto para que se lean rapido:
 # rojo = mas caro/mejor, ambar = medio, verde = mas barato/menor.
 COLOR_NIVEL = {
-    "Alto": "#F43F5E", "Medio-alto": "#F59E0B", "Medio": "#FFC93C",
-    "Bajo-medio": "#3DDC84", "Bajo": "#2ED573",
+    "Muy alto": "#F43F5E", "Alto": "#F59E0B", "Medio-alto": "#F59E0B",
+    "Medio": "#FFC93C", "Bajo-medio": "#3DDC84", "Bajo": "#2ED573",
 }
 
-with st.expander(f"🗺️ Roadmap — Prioridad 3, si hay tiempo/recursos ({len(ROADMAP_PRIORIDAD_3)})", expanded=False):
-    st.caption("Propuestas del documento de roadmap, todavía no iniciadas. Ordenadas como en el documento original.")
-    for r in ROADMAP_PRIORIDAD_3:
+
+def renderizar_tarjetas_roadmap(propuestas: list):
+    """Dibuja las tarjetas de una lista de propuestas de roadmap (evita repetir el bloque HTML por cada prioridad)."""
+    for r in propuestas:
         color_esfuerzo = COLOR_NIVEL.get(r["esfuerzo"], "#7A8296")
         color_impacto = COLOR_NIVEL.get(r["impacto"], "#7A8296")
         st.markdown(
@@ -775,6 +807,24 @@ with st.expander(f"🗺️ Roadmap — Prioridad 3, si hay tiempo/recursos ({len
             """,
             unsafe_allow_html=True,
         )
+
+
+st.markdown(
+    '<div class="section-eyebrow">Próximas mejoras</div>'
+    '<div class="section-title">🗺️ Roadmap de propuestas</div>',
+    unsafe_allow_html=True,
+)
+
+with st.expander(f"🥇 Prioridad 1 — Hacer primero ({len(ROADMAP_PRIORIDAD_1)})", expanded=False):
+    st.caption("Se integran directo al bot/dashboard actual sin cambios grandes de arquitectura.")
+    renderizar_tarjetas_roadmap(ROADMAP_PRIORIDAD_1)
+
+with st.expander(f"🥈 Prioridad 2 — Corto/mediano plazo ({len(ROADMAP_PRIORIDAD_2)})", expanded=False):
+    renderizar_tarjetas_roadmap(ROADMAP_PRIORIDAD_2)
+
+with st.expander(f"🥉 Prioridad 3 — Si hay tiempo/recursos ({len(ROADMAP_PRIORIDAD_3)})", expanded=False):
+    renderizar_tarjetas_roadmap(ROADMAP_PRIORIDAD_3)
+
 
 st.markdown("---")
 
