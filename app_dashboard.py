@@ -237,6 +237,31 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     padding: .9rem 1.1rem; margin: 0 0 1.4rem 0; font-size: .92rem; color: #D3D7E8;
 }
 
+/* ---------- Banda de alertas y avisos activos ---------- */
+.alertas-banner {
+    border-radius: 12px; padding: 1rem 1.2rem; margin: 0 0 1.4rem 0;
+}
+.alertas-banner.hay-alertas {
+    background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.4);
+    border-left: 4px solid #FF4D6D;
+}
+.alertas-banner.sin-alertas {
+    background: rgba(46,213,115,0.06); border: 1px solid rgba(46,213,115,0.3);
+    border-left: 4px solid #2ED573;
+}
+.alertas-banner-titulo {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.05rem;
+    color: #FFFFFF; margin-bottom: .5rem; display:flex; align-items:center; gap:.5rem;
+}
+.alertas-item {
+    display:flex; align-items:center; gap:.5rem; font-size: .88rem;
+    color: #F5F6FA; padding: .3rem 0;
+}
+.alertas-item-badge {
+    font-weight:700; font-size:.62rem; text-transform:uppercase; letter-spacing:.05em;
+    padding:.12rem .5rem; border-radius:999px; color:#090D1A; flex-shrink:0;
+}
+
 /* ---------- Gauge card (resumen de cuenca) ---------- */
 .gauge-card {
     background: #10152A;
@@ -254,11 +279,11 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     font-family:'Inter', sans-serif; font-weight:700; font-size:.64rem; letter-spacing:.06em;
     text-transform: uppercase; padding: .2rem .6rem; border-radius: 999px; color:#090D1A;
 }
-.gauge-station { font-size:.78rem; color:#8890A6; margin-bottom:1rem; }
+.gauge-station { font-size:.78rem; color:#A6ADC4; margin-bottom:1rem; }
 .gauge-value-row { display:flex; align-items:baseline; gap:.4rem; margin-bottom:.55rem; }
 .gauge-value { font-family:'Fraunces', serif; font-weight:700; font-size:1.75rem; color:#FFFFFF; }
-.gauge-value-unit { font-size:.85rem; color:#7A8296; }
-.gauge-foot { font-size:.7rem; color:#6E7690; margin-top:.7rem; }
+.gauge-value-unit { font-size:.85rem; color:#9BA3BD; }
+.gauge-foot { font-size:.7rem; color:#8790A8; margin-top:.7rem; }
 
 /* ---------- Barra de umbrales (el elemento visual central) ----------
    Separa claramente TRES cosas: la zona normal, la zona de alerta y la
@@ -285,7 +310,7 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
 }
 .umbral-marca {
     position: absolute; top: 14px; transform: translateX(-50%);
-    font-size: .62rem; color: #7A8296; white-space: nowrap; text-align: center;
+    font-size: .62rem; color: #9BA3BD; white-space: nowrap; text-align: center;
 }
 .umbral-marca .valor { color: #A8AFC2; font-weight: 600; }
 
@@ -300,7 +325,7 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
 }
 .meta-chip-label {
     font-family: 'JetBrains Mono', monospace; font-size: .62rem; letter-spacing: .05em;
-    text-transform: uppercase; color: #7A8296; margin-bottom: .25rem;
+    text-transform: uppercase; color: #9BA3BD; margin-bottom: .25rem;
 }
 .meta-chip-value { font-size: .86rem; color: #F5F6FA; font-weight: 500; line-height: 1.35; }
 
@@ -337,11 +362,11 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     text-transform: uppercase; padding: .12rem .45rem; border-radius: 999px; color:#090D1A;
     white-space: nowrap; flex-shrink: 0;
 }
-.barrio-card-padre { font-size:.72rem; color:#7A8296; margin-bottom:.4rem; }
+.barrio-card-padre { font-size:.72rem; color:#9BA3BD; margin-bottom:.4rem; }
 .barrio-card-motivo { font-size:.76rem; color:#B8BED1; line-height:1.4; }
 .barrio-card-aprox { font-size:.66rem; color:#F59E0B; margin-top:.35rem; }
 
-.footer-note { font-size:.76rem; color:#565D75; text-align:center; padding: 1.4rem 0 .6rem 0; }
+.footer-note { font-size:.76rem; color:#7B8299; text-align:center; padding: 1.4rem 0 .6rem 0; }
 
 hr { border-color: rgba(255,255,255,0.08) !important; }
 [data-testid="stExpander"] {
@@ -381,8 +406,32 @@ hr { border-color: rgba(255,255,255,0.08) !important; }
     .gauge-name { font-size: 1rem; }
     [data-testid="stExpander"] summary { font-size: .9rem; }
     .meta-grid { grid-template-columns: 1fr 1fr; }
-    .umbral-marca { font-size: .56rem; }
-    .umbral-pin-label { font-size: .6rem; }
+    .umbral-marca { font-size: .68rem; }
+    .umbral-pin-label { font-size: .68rem; }
+    .barrio-card-motivo, .barrio-card-padre { font-size: .8rem; }
+}
+
+/* ---------- Accesibilidad: foco visible al navegar con Tab ----------
+   Sin esto, en varios navegadores/temas el foco de teclado en botones,
+   selectbox y el mapa casi no se nota sobre fondo oscuro. Un anillo
+   celeste bien contrastado deja clarisimo donde esta el foco. */
+*:focus-visible {
+    outline: 3px solid #38BDF8 !important;
+    outline-offset: 2px !important;
+    border-radius: 4px;
+}
+[data-testid="stButton"] button:focus-visible,
+[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within {
+    outline: 3px solid #38BDF8 !important;
+    outline-offset: 2px !important;
+}
+
+/* ---------- Zoom del navegador: todo en rem/%, nada en px fijo para
+   texto, asi escala bien con Ctrl+/Ctrl- y con el tamaño de fuente
+   del sistema. Este bloque solo refuerza un piso legible para que
+   ningun texto quede microscopico. */
+.umbral-marca, .meta-chip-label, .barrio-card-aprox {
+    font-size: .68rem;
 }
 </style>
 """
@@ -449,19 +498,30 @@ def barra_umbral_html(nivel, umbral_alerta, umbral_evacuacion) -> str:
     ancho_alerta = pct_evac - pct_alerta
     ancho_evac = 100 - pct_evac
 
+    # BUG que reportaste ("solo se ve la alerta"): cuando el umbral de
+    # alerta y el de evacuacion estan cerca (ej. 6.00 m y 6.50 m), las
+    # dos etiquetas de texto caian en la MISMA altura y una tapaba a la
+    # otra visualmente. Si estan a menos de 12% de distancia en la
+    # barra, escalonamos la de evacuacion mas abajo para que las dos
+    # queden legibles siempre, sin importar que tan juntos esten los
+    # umbrales.
+    cerca = (pct_evac - pct_alerta) < 12
+    top_evac = "42px" if cerca else "14px"
+
     return f"""
-    <div class="umbral-wrap">
+    <div class="umbral-wrap" style="margin-bottom:{'2.2rem' if cerca else '1.6rem'};">
       <div class="umbral-barra">
         <div class="umbral-zona normal" style="width:{ancho_normal:.1f}%"></div>
         <div class="umbral-zona alerta" style="width:{ancho_alerta:.1f}%"></div>
         <div class="umbral-zona evacuacion" style="width:{ancho_evac:.1f}%"></div>
         <div class="umbral-pin" style="left:{pct_nivel:.1f}%"></div>
         <div class="umbral-pin-label" style="left:{pct_nivel:.1f}%">{nivel} m</div>
-        <div class="umbral-marca" style="left:{pct_alerta:.1f}%">Alerta<br/><span class="valor">{umbral_alerta} m</span></div>
-        <div class="umbral-marca" style="left:{pct_evac:.1f}%">Evacuación<br/><span class="valor">{umbral_evacuacion} m</span></div>
+        <div class="umbral-marca" style="left:{pct_alerta:.1f}%; top:14px;">Alerta<br/><span class="valor">{umbral_alerta} m</span></div>
+        <div class="umbral-marca" style="left:{pct_evac:.1f}%; top:{top_evac};">Evacuación<br/><span class="valor">{umbral_evacuacion} m</span></div>
       </div>
     </div>
     """
+
 
 
 def gauge_html(nombre, estacion, nivel, umbral_alerta, umbral_evac, estado, fuente,
@@ -615,6 +675,47 @@ if con_conexion == 0:
         "todavía a una fuente automática en tiempo real — cada tarjeta lo indica."
     )
 
+# ---------------------------------------------------------------------
+# ALERTAS Y AVISOS ACTIVOS
+#
+# Antes esto solo se veia en el canal de Telegram
+# (t.me/Aviso_CuencasHidricas_Chaco2026). Esta banda replica lo mismo
+# ACA en el dashboard: junta las cuencas y localidades que estan en
+# ALERTA o EVACUACION ahora mismo (se recalcula en cada carga, no es
+# texto fijo) y las muestra arriba de todo, bien visible.
+# ---------------------------------------------------------------------
+avisos_activos = []
+for clave, c in cuencas.items():
+    if c["estado"] != "NORMAL":
+        avisos_activos.append({"tipo": "Cuenca", "nombre": c["nombre"], "estado": c["estado"]})
+for clave, loc in localidades.items():
+    if loc["estado"] != "NORMAL":
+        avisos_activos.append({"tipo": "Localidad", "nombre": loc["nombre"], "estado": loc["estado"]})
+
+if avisos_activos:
+    items_html = "".join(
+        f'<div class="alertas-item">'
+        f'<span class="alertas-item-badge" style="background:{COLOR_ESTADO.get(a["estado"], COLOR_ESTADO["NORMAL"])["hex"]}">{a["estado"]}</span>'
+        f'{a["tipo"]}: {a["nombre"]}'
+        f'</div>'
+        for a in avisos_activos
+    )
+    st.markdown(
+        f'<div class="alertas-banner hay-alertas">'
+        f'<div class="alertas-banner-titulo">🚨 {len(avisos_activos)} aviso{"s" if len(avisos_activos) != 1 else ""} activo{"s" if len(avisos_activos) != 1 else ""}</div>'
+        f'{items_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        '<div class="alertas-banner sin-alertas">'
+        '<div class="alertas-banner-titulo">✅ Sin avisos activos</div>'
+        '<div class="alertas-item">Todas las cuencas y localidades monitoreadas están en estado Normal.</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
 st.markdown(
     f'<div class="contexto-banner">🗓️ <b>Contexto de hoy:</b> {contexto_estacional(mes_actual)}</div>',
     unsafe_allow_html=True,
@@ -688,12 +789,12 @@ PENDIENTES = [
 ESTADO_PENDIENTE_COLOR = {
     "Bloqueado": "#F43F5E",
     "En progreso": "#F59E0B",
-    "Pendiente": "#7A8296",
+    "Pendiente": "#9BA3BD",
 }
 
 with st.expander(f"🛠️ Pendientes del proyecto ({len(PENDIENTES)})", expanded=False):
     for p in PENDIENTES:
-        color = ESTADO_PENDIENTE_COLOR.get(p["estado"], "#7A8296")
+        color = ESTADO_PENDIENTE_COLOR.get(p["estado"], "#9BA3BD")
         st.markdown(
             f'<div style="display:flex; align-items:baseline; gap:.6rem; margin-bottom:.7rem;">'
             f'<span style="background:{color}; color:#090D1A; font-weight:700; font-size:.62rem; '
@@ -701,7 +802,7 @@ with st.expander(f"🛠️ Pendientes del proyecto ({len(PENDIENTES)})", expande
             f'border-radius:999px; white-space:nowrap;">{p["estado"]}</span>'
             f'<div>'
             f'<div style="color:#F5F6FA; font-weight:600; font-size:.88rem;">{p["item"]}</div>'
-            f'<div style="color:#8890A6; font-size:.78rem;">{p["detalle"]}</div>'
+            f'<div style="color:#A6ADC4; font-size:.78rem;">{p["detalle"]}</div>'
             f'</div>'
             f'</div>',
             unsafe_allow_html=True,
@@ -894,7 +995,7 @@ with col_prev:
         st.rerun()
 with col_pos:
     st.markdown(
-        f"<div style='text-align:center; padding-top:.5rem; color:#7A8296; "
+        f"<div style='text-align:center; padding-top:.5rem; color:#9BA3BD; "
         f"font-family:JetBrains Mono, monospace; font-size:.78rem;'>"
         f"{st.session_state.loc_index + 1} / {total_loc}</div>",
         unsafe_allow_html=True,
