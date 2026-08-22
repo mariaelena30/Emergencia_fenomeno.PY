@@ -166,6 +166,18 @@ def mostrar_grafico_tendencia(clave_localidad: str, umbral_alerta: float, umbral
     )
 
 
+def estilo_badge_pill(hex_color: str) -> str:
+    """
+    Antes los badges de estado (Normal/Alerta/Evacuación, etc.) eran un
+    relleno solido con texto oscuro. Esto arma el estilo "pill con
+    borde" del prototipo de referencia: fondo con el color muy tenue,
+    borde solido del color, texto en el mismo color - se lee mas
+    prolijo y es el mismo lenguaje visual en todos los badges del sitio.
+    """
+    r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
+    return f"background:rgba({r},{g},{b},0.15); border:1px solid {hex_color}; color:{hex_color};"
+
+
 def ordenar_por_prioridad(diccionario: dict, orden_claves: list) -> dict:
     """
     Devuelve una copia de `diccionario` reordenada según `orden_claves`.
@@ -201,13 +213,69 @@ def ordenar_localidades_por_cuenca(localidades_dict: dict, orden_cuencas: list) 
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
 
-html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
+html, body, [class*="css"]  { font-family: 'Plus Jakarta Sans', sans-serif; }
 
+/* ---------- Fondo tipo "centro de comando": gradiente radial +
+   grilla de puntos, calcado del prototipo Monitoreo--main ---------- */
 .stApp {
-    background: #090D1A;
+    background-color: #020617;
+    background-image:
+        radial-gradient(circle at center, #0f172a 0%, #020617 100%),
+        radial-gradient(#334155 1px, transparent 1px);
+    background-size: 100% 100%, 24px 24px;
+    background-position: 0 0, 0 0;
     color: #F5F6FA;
+}
+
+/* ---------- Scrollbar custom (Webkit) ---------- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #020617; }
+::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; border: 1px solid #334155; }
+::-webkit-scrollbar-thumb:hover { background: #0ea5e9; }
+
+/* ---------- Glow de neon, para acentuar estados/botones clave ---------- */
+.glow-cyan { box-shadow: 0 0 15px rgba(6,182,212,0.4); }
+.glow-red { box-shadow: 0 0 15px rgba(239,68,68,0.4); }
+.glow-emerald { box-shadow: 0 0 12px rgba(16,185,129,0.35); }
+.glow-amber { box-shadow: 0 0 12px rgba(245,158,11,0.35); }
+
+/* ---------- Barra de telemetria (arriba de todo, estilo EOC) ---------- */
+.telemetry-bar {
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
+    gap:.6rem; background:rgba(2,6,23,0.8); border:1px solid rgba(30,41,59,0.7);
+    border-radius:10px; padding:.5rem .9rem; margin:0 0 1.1rem 0;
+}
+.telemetry-status { display:flex; align-items:center; gap:.5rem; }
+.telemetry-dot {
+    width:8px; height:8px; border-radius:50%; background:#34D399;
+    box-shadow:0 0 0 3px rgba(52,211,153,0.18);
+    animation: pulso-vivo 2s ease-in-out infinite;
+}
+.telemetry-status-texto {
+    font-family:'JetBrains Mono', monospace; font-weight:700; font-size:.66rem;
+    letter-spacing:.12em; text-transform:uppercase; color:#34D399;
+}
+.telemetry-version {
+    font-family:'JetBrains Mono', monospace; font-size:.66rem; color:#64748B;
+    letter-spacing:.06em; text-transform:uppercase;
+}
+
+/* ---------- Navegacion interna estilo pill (enlaces #ancla) ---------- */
+.nav-pills {
+    display:flex; flex-wrap:wrap; gap:.4rem; margin: 0 0 1.3rem 0;
+    position: sticky; top: 0; z-index: 999; padding: .5rem 0;
+}
+.nav-pill {
+    font-family:'Plus Jakarta Sans', sans-serif; font-weight:600; font-size:.76rem;
+    color:#94A3B8; background:rgba(15,23,42,0.75); backdrop-filter: blur(6px);
+    border:1px solid rgba(51,65,85,0.6); border-radius:999px;
+    padding:.35rem .85rem; text-decoration:none; transition: all .15s ease;
+    white-space: nowrap;
+}
+.nav-pill:hover {
+    color:#F5F6FA; border-color:#38BDF8; box-shadow: 0 0 10px rgba(56,189,248,0.3);
 }
 
 /* ---------- Hero ---------- */
@@ -233,11 +301,11 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
 }
 }
 .hero-title {
-    font-family: 'Fraunces', serif; font-weight: 700; font-size: 2.85rem;
+    font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 2.85rem;
     line-height: 1.05; color: #FFFFFF; margin: 0 0 .55rem 0;
 }
 .hero-sub {
-    font-family: 'Inter', sans-serif; font-size: 1rem; color: #A8AFC2;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1rem; color: #A8AFC2;
     max-width: 660px; line-height: 1.55;
 }
 @keyframes fluir-linea {
@@ -256,7 +324,7 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     text-transform: uppercase; font-size: .7rem; color: #7C5CFC; margin-bottom: .2rem;
 }
 .section-title {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.55rem;
+    font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 1.55rem;
     color: #FFFFFF; margin: 0 0 1.1rem 0;
 }
 
@@ -280,7 +348,7 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     border-left: 4px solid #2ED573;
 }
 .alertas-banner-titulo {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.05rem;
+    font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 1.05rem;
     color: #FFFFFF; margin-bottom: .5rem; display:flex; align-items:center; gap:.5rem;
 }
 .alertas-item {
@@ -289,7 +357,7 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
 }
 .alertas-item-badge {
     font-weight:700; font-size:.62rem; text-transform:uppercase; letter-spacing:.05em;
-    padding:.12rem .5rem; border-radius:999px; color:#090D1A; flex-shrink:0;
+    padding:.12rem .5rem; border-radius:999px; flex-shrink:0;
 }
 
 /* ---------- Tickets SOS y reportes ciudadanos ---------- */
@@ -305,24 +373,29 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
 
 /* ---------- Gauge card (resumen de cuenca) ---------- */
 .gauge-card {
-    background: #10152A;
+    background: rgba(16,21,42,0.75);
+    backdrop-filter: blur(8px);
     border: 1px solid rgba(255,255,255,0.06);
     border-top: 3px solid var(--gauge-accent, #7C5CFC);
     border-radius: 14px; padding: 1.15rem 1.25rem 1.3rem 1.25rem;
     margin-bottom: .9rem;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--gauge-accent, #7C5CFC) 20%, transparent);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-.gauge-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+.gauge-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 0 20px color-mix(in srgb, var(--gauge-accent, #7C5CFC) 35%, transparent);
+}
 }
 .gauge-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.3rem; }
-.gauge-name { font-family:'Fraunces', serif; font-weight:600; font-size:1.1rem; color:#FFFFFF; }
+.gauge-name { font-family:'Outfit', sans-serif; font-weight:600; font-size:1.1rem; color:#FFFFFF; }
 .gauge-badge {
-    font-family:'Inter', sans-serif; font-weight:700; font-size:.64rem; letter-spacing:.06em;
-    text-transform: uppercase; padding: .2rem .6rem; border-radius: 999px; color:#090D1A;
+    font-family:'Plus Jakarta Sans', sans-serif; font-weight:700; font-size:.64rem; letter-spacing:.06em;
+    text-transform: uppercase; padding: .2rem .6rem; border-radius: 999px;
 }
 .gauge-station { font-size:.78rem; color:#A6ADC4; margin-bottom:1rem; }
 .gauge-value-row { display:flex; align-items:baseline; gap:.4rem; margin-bottom:.55rem; }
-.gauge-value { font-family:'Fraunces', serif; font-weight:700; font-size:1.75rem; color:#FFFFFF; }
+.gauge-value { font-family:'Outfit', sans-serif; font-weight:700; font-size:1.75rem; color:#FFFFFF; }
 .gauge-value-unit { font-size:.85rem; color:#9BA3BD; }
 .gauge-foot { font-size:.7rem; color:#8790A8; margin-top:.7rem; }
 
@@ -397,10 +470,10 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     border-radius: 10px; padding: .75rem .85rem;
 }
 .barrio-card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:.4rem; margin-bottom:.3rem; }
-.barrio-card-nombre { font-family:'Fraunces', serif; font-weight:600; font-size:.92rem; color:#FFFFFF; line-height:1.25; }
+.barrio-card-nombre { font-family:'Outfit', sans-serif; font-weight:600; font-size:.92rem; color:#FFFFFF; line-height:1.25; }
 .barrio-card-badge {
-    font-family:'Inter', sans-serif; font-weight:700; font-size:.58rem; letter-spacing:.05em;
-    text-transform: uppercase; padding: .12rem .45rem; border-radius: 999px; color:#090D1A;
+    font-family:'Plus Jakarta Sans', sans-serif; font-weight:700; font-size:.58rem; letter-spacing:.05em;
+    text-transform: uppercase; padding: .12rem .45rem; border-radius: 999px;
     white-space: nowrap; flex-shrink: 0;
 }
 .barrio-card-padre { font-size:.72rem; color:#9BA3BD; margin-bottom:.4rem; }
@@ -420,7 +493,7 @@ hr { border-color: rgba(255,255,255,0.08) !important; }
    defecto) termina tapando la primera letra. flex-start + flex-shrink:0
    en el icono evita la superposicion. */
 [data-testid="stExpander"] summary {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.02rem;
+    font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 1.02rem;
     display: flex !important;
     align-items: flex-start !important;
     gap: .55rem;
@@ -573,7 +646,7 @@ def gauge_html(nombre, estacion, nivel, umbral_alerta, umbral_evac, estado, fuen
     <div class="gauge-card" style="--gauge-accent:{acento}">
       <div class="gauge-top">
         <span class="gauge-name">{nombre}</span>
-        <span class="gauge-badge" style="background:{estilo['hex']}">{estilo['label']}</span>
+        <span class="gauge-badge" style="{estilo_badge_pill(estilo['hex'])}">{estilo['label']}</span>
       </div>
       <div class="gauge-station">{estacion}</div>
       <div class="gauge-value-row">
@@ -676,6 +749,34 @@ def cargar_datos():
 
 
 # ---------------------------------------------------------------------
+# BARRA DE TELEMETRIA
+# ---------------------------------------------------------------------
+ahora_texto = datetime.now().strftime("%d %b %Y").upper() + " · " + datetime.now().strftime("%H:%M") + " ART"
+st.markdown(
+    '<div class="telemetry-bar">'
+    '<div class="telemetry-status">'
+    '<span class="telemetry-dot"></span>'
+    '<span class="telemetry-status-texto">Sistema operativo</span>'
+    '</div>'
+    f'<span class="telemetry-version">Portal Hídrico Chaco · {ahora_texto}</span>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
+# ---------------------------------------------------------------------
+# NAVEGACION INTERNA (enlaces #ancla a cada seccion de esta misma pagina)
+# ---------------------------------------------------------------------
+st.markdown(
+    '<div class="nav-pills">'
+    '<a href="#cuencas" class="nav-pill">🌊 Cuencas</a>'
+    '<a href="#mapa" class="nav-pill">🗺️ Mapa</a>'
+    '<a href="#localidades" class="nav-pill">📍 Localidades</a>'
+    '<a href="#barrios" class="nav-pill">⚠️ Barrios vulnerables</a>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
+# ---------------------------------------------------------------------
 # HERO
 # ---------------------------------------------------------------------
 st.markdown(
@@ -736,7 +837,7 @@ for clave, loc in localidades.items():
 if avisos_activos:
     items_html = "".join(
         f'<div class="alertas-item">'
-        f'<span class="alertas-item-badge" style="background:{COLOR_ESTADO.get(a["estado"], COLOR_ESTADO["NORMAL"])["hex"]}">{a["estado"]}</span>'
+        f'<span class="alertas-item-badge" style="{estilo_badge_pill(COLOR_ESTADO.get(a["estado"], COLOR_ESTADO["NORMAL"])["hex"])}">{a["estado"]}</span>'
         f'{a["tipo"]}: {a["nombre"]}'
         f'</div>'
         for a in avisos_activos
@@ -852,6 +953,12 @@ with st.expander(f"🛠️ Pendientes del proyecto ({len(PENDIENTES)})", expande
 # ---------------------------------------------------------------------
 # SOS Y REPORTE CIUDADANO (Prioridad 1 del roadmap)
 #
+# Antes esto era una seccion enorme con 3 pestañas ocupando todo el
+# ancho. Ahora son dos botones chicos que abren un modal (st.dialog),
+# igual que el boton rojo "PEDIR AYUDA SOS" del prototipo de
+# referencia - mucho mas compacto, no compite con el resto del
+# dashboard por espacio.
+#
 # Sin captura de GPS de un tap todavia (necesitaria un componente JS
 # aparte, no probado en este entorno) - se usa la coordenada del centro
 # de la localidad elegida como ubicacion por defecto, con un campo
@@ -903,37 +1010,27 @@ def cargar_reportes_ciudadanos():
         return []
 
 
-st.markdown(
-    '<div class="section-eyebrow">Emergencias</div>'
-    '<div class="section-title">🆘 Pedir ayuda y reportar</div>',
-    unsafe_allow_html=True,
-)
-
-tab_sos, tab_reporte, tab_activos = st.tabs(["🆘 Pedir ayuda (SOS)", "📸 Reportar anegamiento", "📋 Solicitudes activas"])
-
-with tab_sos:
+@st.dialog("🆘 Pedir ayuda (SOS)")
+def modal_sos():
     st.caption(
         "Para emergencias con riesgo de vida, llamá primero a Defensa Civil (103) o Bomberos (100). "
         "Este formulario avisa al sistema, pero no reemplaza la llamada telefónica."
     )
     with st.form("form_sos", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            nombre_sos = st.text_input("Nombre y apellido *")
-            telefono_sos = st.text_input("Teléfono de contacto *")
-            localidad_sos = st.selectbox(
-                "Localidad *", options=list(localidades.keys()),
-                format_func=lambda k: localidades[k]["nombre"], key="loc_sos",
-            )
-            direccion_sos = st.text_input("Dirección (calle y altura)")
-        with col2:
-            personas_sos = st.number_input("Personas afectadas", min_value=1, value=1, step=1)
-            altura_agua_sos = st.number_input("Altura del agua en la vivienda (cm)", min_value=0, value=0, step=5)
-            urgencia_sos = st.selectbox("Nivel de urgencia", ["ALTO", "MEDIO", "BAJO"], index=0)
-            requiere_sos = st.multiselect(
-                "¿Qué necesitás?", options=list(REQUIERE_OPCIONES.keys()),
-                format_func=lambda k: REQUIERE_OPCIONES[k],
-            )
+        nombre_sos = st.text_input("Nombre y apellido *")
+        telefono_sos = st.text_input("Teléfono de contacto *")
+        localidad_sos = st.selectbox(
+            "Localidad *", options=list(localidades.keys()),
+            format_func=lambda k: localidades[k]["nombre"], key="loc_sos",
+        )
+        direccion_sos = st.text_input("Dirección (calle y altura)")
+        personas_sos = st.number_input("Personas afectadas", min_value=1, value=1, step=1)
+        altura_agua_sos = st.number_input("Altura del agua en la vivienda (cm)", min_value=0, value=0, step=5)
+        urgencia_sos = st.selectbox("Nivel de urgencia", ["ALTO", "MEDIO", "BAJO"], index=0)
+        requiere_sos = st.multiselect(
+            "¿Qué necesitás?", options=list(REQUIERE_OPCIONES.keys()),
+            format_func=lambda k: REQUIERE_OPCIONES[k],
+        )
         notas_sos = st.text_area("Notas adicionales (puntos de referencia, personas vulnerables, etc.)")
         coords_manual_sos = st.text_input(
             "Coordenadas exactas (opcional) — pegá 'lat, lon' desde Google Maps si las tenés",
@@ -965,22 +1062,21 @@ with tab_sos:
                     st.success(f"Solicitud enviada (ticket {resultado['ticket']['id']}). Defensa Civil fue notificada.")
                     cargar_tickets_sos.clear()
 
-with tab_reporte:
+
+@st.dialog("📸 Reportar anegamiento")
+def modal_reporte():
     st.caption("Tu reporte ayuda a alertar a los vecinos y guiar a las cuadrillas, aunque no sea una emergencia con riesgo de vida.")
     with st.form("form_reporte", clear_on_submit=True):
         nombre_rep = st.text_input("Nombre (opcional)")
-        col1, col2 = st.columns(2)
-        with col1:
-            localidad_rep = st.selectbox(
-                "Localidad *", options=list(localidades.keys()),
-                format_func=lambda k: localidades[k]["nombre"], key="loc_reporte",
-            )
-            calle_rep = st.text_input("Calle / punto de referencia *")
-        with col2:
-            nivel_agua_rep = st.selectbox(
-                "Nivel de agua aproximado", options=list(NIVEL_AGUA_OPCIONES.keys()),
-                format_func=lambda k: NIVEL_AGUA_OPCIONES[k],
-            )
+        localidad_rep = st.selectbox(
+            "Localidad *", options=list(localidades.keys()),
+            format_func=lambda k: localidades[k]["nombre"], key="loc_reporte",
+        )
+        calle_rep = st.text_input("Calle / punto de referencia *")
+        nivel_agua_rep = st.selectbox(
+            "Nivel de agua aproximado", options=list(NIVEL_AGUA_OPCIONES.keys()),
+            format_func=lambda k: NIVEL_AGUA_OPCIONES[k],
+        )
         descripcion_rep = st.text_area("Descripción del anegamiento")
         st.caption("📷 Subida de foto todavía no disponible — se suma cuando esté lista la base de datos persistente (Supabase).")
         enviar_rep = st.form_submit_button("📸 Enviar reporte", use_container_width=True)
@@ -1001,53 +1097,15 @@ with tab_reporte:
                     st.success(f"Reporte enviado (id {resultado['reporte']['id']}). ¡Gracias por avisar!")
                     cargar_reportes_ciudadanos.clear()
 
-with tab_activos:
-    tickets = cargar_tickets_sos()
-    reportes = cargar_reportes_ciudadanos()
 
-    if st.button("🔄 Actualizar"):
-        cargar_tickets_sos.clear()
-        cargar_reportes_ciudadanos.clear()
-        st.rerun()
-
-    st.markdown("**Tickets SOS**")
-    if not tickets:
-        st.caption("Sin solicitudes de ayuda registradas.")
-    else:
-        color_urgencia = {"ALTO": "#FF4D6D", "MEDIO": "#FFC93C", "BAJO": "#3DDC84"}
-        for t in tickets[:15]:
-            color = color_urgencia.get(t.get("nivel_urgencia"), "#7A8296")
-            nombre_loc = localidades.get(t["localidad"], {}).get("nombre", t["localidad"])
-            st.markdown(
-                f'<div class="ticket-card" style="--ticket-accent:{color}">'
-                f'<div class="ticket-card-top">'
-                f'<span class="ticket-card-nombre">{t["nombre"]}</span>'
-                f'<span class="alertas-item-badge" style="background:{color}">{t["estado"]}</span>'
-                f'</div>'
-                f'<div class="ticket-card-meta">{nombre_loc} · {t["timestamp"]} · Urgencia: {t["nivel_urgencia"]}</div>'
-                f'<div class="ticket-card-detalle">{t.get("personas_afectadas", 1)} persona(s)'
-                f'{" · agua a " + str(t["altura_agua_cm"]) + " cm" if t.get("altura_agua_cm") else ""}'
-                f'{" · " + t["notas"] if t.get("notas") else ""}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
-    st.markdown("**Reportes ciudadanos**")
-    if not reportes:
-        st.caption("Sin reportes ciudadanos registrados.")
-    else:
-        for r in reportes[:15]:
-            nombre_loc = localidades.get(r["localidad"], {}).get("nombre", r["localidad"])
-            st.markdown(
-                f'<div class="ticket-card" style="--ticket-accent:#38BDF8">'
-                f'<div class="ticket-card-top">'
-                f'<span class="ticket-card-nombre">{r["calle"]}</span>'
-                f'</div>'
-                f'<div class="ticket-card-meta">{nombre_loc} · {r["timestamp"]} · {NIVEL_AGUA_OPCIONES.get(r["nivel_agua_aprox"], r["nivel_agua_aprox"])}</div>'
-                f'<div class="ticket-card-detalle">{r.get("descripcion") or "Sin descripción adicional."} — reportado por {r["nombre"]}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
+# Fila compacta de botones (esto reemplaza la seccion gigante de antes)
+col_sos, col_rep, col_espacio = st.columns([1.3, 1.6, 4])
+with col_sos:
+    if st.button("🆘 PEDIR AYUDA SOS", type="primary", use_container_width=True):
+        modal_sos()
+with col_rep:
+    if st.button("📸 Reportar anegamiento", use_container_width=True):
+        modal_reporte()
 
 st.markdown("---")
 
@@ -1056,7 +1114,7 @@ st.markdown("---")
 # ---------------------------------------------------------------------
 st.markdown(
     '<div class="section-eyebrow">Panorama general</div>'
-    '<div class="section-title">🌊 Estado de las 4 cuencas</div>',
+    '<div class="section-title" id="cuencas">🌊 Estado de las 4 cuencas</div>',
     unsafe_allow_html=True,
 )
 cols = st.columns(4)
@@ -1086,7 +1144,7 @@ st.markdown("---")
 # ---------------------------------------------------------------------
 st.markdown(
     '<div class="section-eyebrow">Vista territorial</div>'
-    '<div class="section-title">🗺 Mapa de localidades monitoreadas</div>',
+    '<div class="section-title" id="mapa">🗺 Mapa de localidades monitoreadas</div>',
     unsafe_allow_html=True,
 )
 
@@ -1192,7 +1250,7 @@ for clave, b in datos_barrios.items():
 leyenda_html = """
 <div style="position:absolute; bottom:14px; right:14px; z-index:1000;
      background:rgba(9,13,26,0.92); border:1px solid rgba(56,189,248,0.35);
-     border-radius:10px; padding:.7rem .9rem; font-family:'Inter',sans-serif;
+     border-radius:10px; padding:.7rem .9rem; font-family:'Plus Jakarta Sans',sans-serif;
      font-size:.7rem; color:#D3D7E8; max-width:210px; box-shadow:0 8px 20px rgba(0,0,0,0.4);">
   <div style="font-weight:700; color:#FFFFFF; margin-bottom:.4rem; font-size:.68rem;
        text-transform:uppercase; letter-spacing:.05em;">Referencias</div>
@@ -1235,7 +1293,7 @@ if datos_barrios:
     st.markdown("---")
     st.markdown(
         '<div class="section-eyebrow">Detalle histórico</div>'
-        '<div class="section-title">⚠️ Barrios y zonas históricamente más vulnerables</div>',
+        '<div class="section-title" id="barrios">⚠️ Barrios y zonas históricamente más vulnerables</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -1261,7 +1319,7 @@ if datos_barrios:
             f'<div class="barrio-card" style="--barrio-accent:{estilo_b["hex"]}">'
             f'<div class="barrio-card-top">'
             f'<span class="barrio-card-nombre">{b["emoji"]} {b["nombre"]}</span>'
-            f'<span class="barrio-card-badge" style="background:{estilo_b["hex"]}">{estilo_b["label"]}</span>'
+            f'<span class="barrio-card-badge" style="{estilo_badge_pill(estilo_b["hex"])}">{estilo_b["label"]}</span>'
             f'</div>'
             f'<div class="barrio-card-padre">Dentro de {nombre_padre}</div>'
             f'<div class="barrio-card-motivo">{b["motivo"]}</div>'
@@ -1274,7 +1332,7 @@ if datos_barrios:
 st.markdown("---")
 st.markdown(
     '<div class="section-eyebrow">Detalle</div>'
-    '<div class="section-title">📍 Detalle por localidad</div>',
+    '<div class="section-title" id="localidades">📍 Detalle por localidad</div>',
     unsafe_allow_html=True,
 )
 
@@ -1338,7 +1396,7 @@ st.markdown(
     f'<div class="gauge-card" style="--gauge-accent:{estilo["hex"]}; margin-top:.8rem;">'
     f'<div class="gauge-top">'
     f'<span class="gauge-name">{loc["emoji"]} {loc["nombre"]}{aviso}</span>'
-    f'<span class="gauge-badge" style="background:{estilo["hex"]}">{estilo["label"]}</span>'
+    f'<span class="gauge-badge" style="{estilo_badge_pill(estilo["hex"])}">{estilo["label"]}</span>'
     f'</div>'
     f'</div>',
     unsafe_allow_html=True,
@@ -1390,6 +1448,64 @@ st.markdown(
         loc["estado"], fase_oni_actual, mes_actual, loc.get("precipitacion_acumulada_mm"),
     )
 )
+
+st.markdown("---")
+
+# ---------------------------------------------------------------------
+# SOLICITUDES ACTIVAS (SOS + reportes ciudadanos) — chico, abajo de
+# todo, colapsado por defecto. Antes esto era una pestaña grande;
+# ahora es solo un expander compacto, como pediste.
+# ---------------------------------------------------------------------
+tickets_activos = cargar_tickets_sos()
+reportes_activos = cargar_reportes_ciudadanos()
+total_activos = len(tickets_activos) + len(reportes_activos)
+
+with st.expander(f"📋 Solicitudes activas (SOS + reportes) — {total_activos}", expanded=False):
+    if st.button("🔄 Actualizar lista"):
+        cargar_tickets_sos.clear()
+        cargar_reportes_ciudadanos.clear()
+        st.rerun()
+
+    st.markdown("**Tickets SOS**")
+    if not tickets_activos:
+        st.caption("Sin solicitudes de ayuda registradas.")
+    else:
+        color_urgencia = {"ALTO": "#FF4D6D", "MEDIO": "#FFC93C", "BAJO": "#3DDC84"}
+        for t in tickets_activos[:15]:
+            color = color_urgencia.get(t.get("nivel_urgencia"), "#7A8296")
+            nombre_loc = localidades.get(t["localidad"], {}).get("nombre", t["localidad"])
+            es_urgente_activo = t.get("nivel_urgencia") == "ALTO" and t.get("estado") == "PENDIENTE"
+            glow_urgente = " box-shadow:0 0 16px rgba(255,77,109,0.5); animation:pulso-vivo 2s ease-in-out infinite;" if es_urgente_activo else ""
+            st.markdown(
+                f'<div class="ticket-card" style="--ticket-accent:{color};{glow_urgente}">'
+                f'<div class="ticket-card-top">'
+                f'<span class="ticket-card-nombre">{t["nombre"]}</span>'
+                f'<span class="alertas-item-badge" style="{estilo_badge_pill(color)}">{t["estado"]}</span>'
+                f'</div>'
+                f'<div class="ticket-card-meta">{nombre_loc} · {t["timestamp"]} · Urgencia: {t["nivel_urgencia"]}</div>'
+                f'<div class="ticket-card-detalle">{t.get("personas_afectadas", 1)} persona(s)'
+                f'{" · agua a " + str(t["altura_agua_cm"]) + " cm" if t.get("altura_agua_cm") else ""}'
+                f'{" · " + t["notas"] if t.get("notas") else ""}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("**Reportes ciudadanos**")
+    if not reportes_activos:
+        st.caption("Sin reportes ciudadanos registrados.")
+    else:
+        for r in reportes_activos[:15]:
+            nombre_loc = localidades.get(r["localidad"], {}).get("nombre", r["localidad"])
+            st.markdown(
+                f'<div class="ticket-card" style="--ticket-accent:#38BDF8">'
+                f'<div class="ticket-card-top">'
+                f'<span class="ticket-card-nombre">{r["calle"]}</span>'
+                f'</div>'
+                f'<div class="ticket-card-meta">{nombre_loc} · {r["timestamp"]} · {NIVEL_AGUA_OPCIONES.get(r["nivel_agua_aprox"], r["nivel_agua_aprox"])}</div>'
+                f'<div class="ticket-card-detalle">{r.get("descripcion") or "Sin descripción adicional."} — reportado por {r["nombre"]}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
 st.markdown(
     '<div class="footer-note">Este portal y el bot de Telegram @cuencas_chaco_bot '
