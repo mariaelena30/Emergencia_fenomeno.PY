@@ -695,138 +695,17 @@ with st.expander(f"🛠️ Pendientes del proyecto ({len(PENDIENTES)})", expande
     for p in PENDIENTES:
         color = ESTADO_PENDIENTE_COLOR.get(p["estado"], "#7A8296")
         st.markdown(
-            f"""
-            <div style="display:flex; align-items:baseline; gap:.6rem; margin-bottom:.7rem;">
-              <span style="background:{color}; color:#090D1A; font-weight:700; font-size:.62rem;
-                    text-transform:uppercase; letter-spacing:.05em; padding:.15rem .55rem;
-                    border-radius:999px; white-space:nowrap;">{p['estado']}</span>
-              <div>
-                <div style="color:#F5F6FA; font-weight:600; font-size:.88rem;">{p['item']}</div>
-                <div style="color:#8890A6; font-size:.78rem;">{p['detalle']}</div>
-              </div>
-            </div>
-            """,
+            f'<div style="display:flex; align-items:baseline; gap:.6rem; margin-bottom:.7rem;">'
+            f'<span style="background:{color}; color:#090D1A; font-weight:700; font-size:.62rem; '
+            f'text-transform:uppercase; letter-spacing:.05em; padding:.15rem .55rem; '
+            f'border-radius:999px; white-space:nowrap;">{p["estado"]}</span>'
+            f'<div>'
+            f'<div style="color:#F5F6FA; font-weight:600; font-size:.88rem;">{p["item"]}</div>'
+            f'<div style="color:#8890A6; font-size:.78rem;">{p["detalle"]}</div>'
+            f'</div>'
+            f'</div>',
             unsafe_allow_html=True,
         )
-
-# ---------------------------------------------------------------------
-# ROADMAP — PRIORIDADES 1, 2 y 3 (propuestas nuevas, no deuda tecnica)
-#
-# Del documento "Portal Hidrico Chaco - Roadmap de mejoras" (12/08/2026).
-# A diferencia de PENDIENTES (cosas que ya se decidieron hacer), esto es
-# el banco de propuestas ordenadas por prioridad - se muestra separado
-# para no mezclar roadmap especulativo con deuda tecnica real.
-# ---------------------------------------------------------------------
-ROADMAP_PRIORIDAD_1 = [
-    {
-        "propuesta": 'Botón de "pedir ayuda" geolocalizado',
-        "descripcion": "Comando en el bot que capture ubicación GPS del usuario y la envíe directo a Defensa Civil/Bomberos ante una emergencia.",
-        "esfuerzo": "Medio", "impacto": "Muy alto",
-    },
-    {
-        "propuesta": "Reporte ciudadano en tiempo real",
-        "descripcion": "Comando /reportar: el usuario sube foto + ubicación de un anegamiento puntual. Genera datos que ningún sensor oficial capta.",
-        "esfuerzo": "Medio", "impacto": "Muy alto",
-    },
-]
-
-ROADMAP_PRIORIDAD_2 = [
-    {
-        "propuesta": "Mapa de refugios y rutas de evacuación",
-        "descripcion": "Capa en el dashboard con centros de evacuación y rutas que no se cortan con el agua, cruzada con el DEM de QGIS para marcar tramos riesgosos.",
-        "esfuerzo": "Medio", "impacto": "Alto",
-    },
-    {
-        "propuesta": "Índice compuesto de vulnerabilidad por barrio",
-        "descripcion": "Combina NDVI + pendiente (DEM) + distancia al río + capa BARRIOS_VULNERABLES en un solo puntaje por barrio.",
-        "esfuerzo": "Medio-alto", "impacto": "Alto",
-    },
-    {
-        "propuesta": "Umbral dinámico de alerta",
-        "descripcion": "En vez de umbral fijo, combinar acumulado de lluvia (24-72h) + nivel actual + tendencia (regresión simple) para estimar horas hasta desborde.",
-        "esfuerzo": "Medio-alto", "impacto": "Alto",
-    },
-]
-
-ROADMAP_PRIORIDAD_3 = [
-    {
-        "propuesta": "Bot de WhatsApp (espejo del de Telegram)",
-        "descripcion": "Amplía el alcance en zonas rurales (El Sauzalito, Fuerte Esperanza) donde Telegram tiene poca penetración.",
-        "esfuerzo": "Alto", "impacto": "Alto",
-    },
-    {
-        "propuesta": "Vista operativa para personal (Bomberos/Defensa Civil)",
-        "descripcion": "Panel separado del público, con capas de recursos (móviles, brigadas, insumos) sobre las zonas de riesgo.",
-        "esfuerzo": "Alto", "impacto": "Medio-alto",
-    },
-    {
-        "propuesta": "Modo offline / alertas por SMS",
-        "descripcion": "Fallback por SMS (Twilio u otro) para el personal en campo cuando falla el 4G.",
-        "esfuerzo": "Alto", "impacto": "Medio",
-    },
-    {
-        "propuesta": "Comparación con crecidas históricas",
-        "descripcion": "Matching simple del patrón actual contra eventos pasados registrados, para dar contexto humano a la alerta.",
-        "esfuerzo": "Medio", "impacto": "Medio",
-    },
-    {
-        "propuesta": "Panel de verificación humana pre-alerta",
-        "descripcion": "Las alertas automáticas pasan por revisión (vos o Defensa Civil) antes de salir al público, para evitar falsos positivos.",
-        "esfuerzo": "Bajo-medio", "impacto": "Medio",
-    },
-]
-
-# Mismo criterio de color en esfuerzo/impacto para que se lean rapido:
-# rojo = mas caro/mejor, ambar = medio, verde = mas barato/menor.
-COLOR_NIVEL = {
-    "Muy alto": "#F43F5E", "Alto": "#F59E0B", "Medio-alto": "#F59E0B",
-    "Medio": "#FFC93C", "Bajo-medio": "#3DDC84", "Bajo": "#2ED573",
-}
-
-
-def renderizar_tarjetas_roadmap(propuestas: list):
-    """Dibuja las tarjetas de una lista de propuestas de roadmap (evita repetir el bloque HTML por cada prioridad)."""
-    for r in propuestas:
-        color_esfuerzo = COLOR_NIVEL.get(r["esfuerzo"], "#7A8296")
-        color_impacto = COLOR_NIVEL.get(r["impacto"], "#7A8296")
-        st.markdown(
-            f"""
-            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
-                        border-radius:10px; padding:.75rem .9rem; margin-bottom:.6rem;">
-              <div style="color:#F5F6FA; font-weight:600; font-size:.9rem; margin-bottom:.3rem;">{r['propuesta']}</div>
-              <div style="color:#B8BED1; font-size:.8rem; line-height:1.4; margin-bottom:.5rem;">{r['descripcion']}</div>
-              <div style="display:flex; gap:.5rem;">
-                <span style="background:{color_esfuerzo}; color:#090D1A; font-weight:700; font-size:.6rem;
-                      text-transform:uppercase; letter-spacing:.04em; padding:.12rem .5rem; border-radius:999px;">
-                      Esfuerzo: {r['esfuerzo']}</span>
-                <span style="background:{color_impacto}; color:#090D1A; font-weight:700; font-size:.6rem;
-                      text-transform:uppercase; letter-spacing:.04em; padding:.12rem .5rem; border-radius:999px;">
-                      Impacto: {r['impacto']}</span>
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-
-st.markdown(
-    '<div class="section-eyebrow">Próximas mejoras</div>'
-    '<div class="section-title">🗺️ Roadmap de propuestas</div>',
-    unsafe_allow_html=True,
-)
-
-with st.expander(f"🥇 Prioridad 1 — Hacer primero ({len(ROADMAP_PRIORIDAD_1)})", expanded=False):
-    st.caption("Se integran directo al bot/dashboard actual sin cambios grandes de arquitectura.")
-    renderizar_tarjetas_roadmap(ROADMAP_PRIORIDAD_1)
-
-with st.expander(f"🥈 Prioridad 2 — Corto/mediano plazo ({len(ROADMAP_PRIORIDAD_2)})", expanded=False):
-    renderizar_tarjetas_roadmap(ROADMAP_PRIORIDAD_2)
-
-with st.expander(f"🥉 Prioridad 3 — Si hay tiempo/recursos ({len(ROADMAP_PRIORIDAD_3)})", expanded=False):
-    renderizar_tarjetas_roadmap(ROADMAP_PRIORIDAD_3)
-
-
-st.markdown("---")
 
 # ---------------------------------------------------------------------
 # GAUGES DE LAS 4 CUENCAS
@@ -945,20 +824,25 @@ if datos_barrios:
         estilo_b = COLOR_ESTADO.get(b["estado"], COLOR_ESTADO["NORMAL"])
         es_aproximada = b["precision"] != "confirmada"
         aviso_precision = (
-            f'<div class="barrio-card-aprox">📍 ubicación aproximada</div>' if es_aproximada else ""
+            '<div class="barrio-card-aprox">📍 ubicación aproximada</div>' if es_aproximada else ""
         )
         nombre_padre = b.get("nombre_localidad_padre", b["localidad_padre"])
-        tarjetas_barrios += f"""
-        <div class="barrio-card" style="--barrio-accent:{estilo_b['hex']}">
-          <div class="barrio-card-top">
-            <span class="barrio-card-nombre">{b['emoji']} {b['nombre']}</span>
-            <span class="barrio-card-badge" style="background:{estilo_b['hex']}">{estilo_b['label']}</span>
-          </div>
-          <div class="barrio-card-padre">Dentro de {nombre_padre}</div>
-          <div class="barrio-card-motivo">{b['motivo']}</div>
-          {aviso_precision}
-        </div>
-        """
+        # OJO: nada de indentacion ni saltos de linea con espacios adelante
+        # dentro de este HTML. Streamlit pasa esto primero por un parser de
+        # Markdown antes que por HTML, y Markdown interpreta 4+ espacios de
+        # indentacion al arrancar una linea como "bloque de codigo" - ahi
+        # es donde se rompian las tarjetas (se veian como texto crudo).
+        tarjetas_barrios += (
+            f'<div class="barrio-card" style="--barrio-accent:{estilo_b["hex"]}">'
+            f'<div class="barrio-card-top">'
+            f'<span class="barrio-card-nombre">{b["emoji"]} {b["nombre"]}</span>'
+            f'<span class="barrio-card-badge" style="background:{estilo_b["hex"]}">{estilo_b["label"]}</span>'
+            f'</div>'
+            f'<div class="barrio-card-padre">Dentro de {nombre_padre}</div>'
+            f'<div class="barrio-card-motivo">{b["motivo"]}</div>'
+            f'{aviso_precision}'
+            f'</div>'
+        )
 
     st.markdown(f'<div class="barrio-grid">{tarjetas_barrios}</div>', unsafe_allow_html=True)
 
@@ -1026,25 +910,21 @@ estilo = COLOR_ESTADO.get(loc["estado"], COLOR_ESTADO["NORMAL"])
 precip = loc.get("precipitacion_acumulada_mm")
 
 st.markdown(
-    f"""
-    <div class="gauge-card" style="--gauge-accent:{estilo['hex']}; margin-top:.8rem;">
-      <div class="gauge-top">
-        <span class="gauge-name">{loc['emoji']} {loc['nombre']}{aviso}</span>
-        <span class="gauge-badge" style="background:{estilo['hex']}">{estilo['label']}</span>
-      </div>
-    </div>
-    """,
+    f'<div class="gauge-card" style="--gauge-accent:{estilo["hex"]}; margin-top:.8rem;">'
+    f'<div class="gauge-top">'
+    f'<span class="gauge-name">{loc["emoji"]} {loc["nombre"]}{aviso}</span>'
+    f'<span class="gauge-badge" style="background:{estilo["hex"]}">{estilo["label"]}</span>'
+    f'</div>'
+    f'</div>',
     unsafe_allow_html=True,
 )
 
 # Valor grande del nivel actual + badge de estado
 st.markdown(
-    f"""
-    <div class="gauge-value-row" style="margin-top:.7rem;">
-      <span class="gauge-value">{loc['nivel_metros']}</span>
-      <span class="gauge-value-unit">metros — nivel actual</span>
-    </div>
-    """,
+    f'<div class="gauge-value-row" style="margin-top:.7rem;">'
+    f'<span class="gauge-value">{loc["nivel_metros"]}</span>'
+    f'<span class="gauge-value-unit">metros — nivel actual</span>'
+    f'</div>',
     unsafe_allow_html=True,
 )
 
@@ -1057,26 +937,24 @@ mostrar_grafico_tendencia(clave, loc["umbral_alerta"], loc["umbral_evacuacion"])
 precip_txt = f"{precip:.0f} mm" if precip is not None else "Sin dato"
 conectado_txt = "Sí, en vivo" if loc["conectado"] else "No, dato de referencia"
 st.markdown(
-    f"""
-    <div class="meta-grid">
-      <div class="meta-chip">
-        <div class="meta-chip-label">Precipitación acumulada</div>
-        <div class="meta-chip-value">{precip_txt}</div>
-      </div>
-      <div class="meta-chip">
-        <div class="meta-chip-label">Conectado en vivo</div>
-        <div class="meta-chip-value">{conectado_txt}</div>
-      </div>
-      <div class="meta-chip">
-        <div class="meta-chip-label">Última verificación</div>
-        <div class="meta-chip-value">{loc['ultima_verificacion']}</div>
-      </div>
-      <div class="meta-chip">
-        <div class="meta-chip-label">Fuente</div>
-        <div class="meta-chip-value">{loc['fuente']}</div>
-      </div>
-    </div>
-    """,
+    f'<div class="meta-grid">'
+    f'<div class="meta-chip">'
+    f'<div class="meta-chip-label">Precipitación acumulada</div>'
+    f'<div class="meta-chip-value">{precip_txt}</div>'
+    f'</div>'
+    f'<div class="meta-chip">'
+    f'<div class="meta-chip-label">Conectado en vivo</div>'
+    f'<div class="meta-chip-value">{conectado_txt}</div>'
+    f'</div>'
+    f'<div class="meta-chip">'
+    f'<div class="meta-chip-label">Última verificación</div>'
+    f'<div class="meta-chip-value">{loc["ultima_verificacion"]}</div>'
+    f'</div>'
+    f'<div class="meta-chip">'
+    f'<div class="meta-chip-label">Fuente</div>'
+    f'<div class="meta-chip-value">{loc["fuente"]}</div>'
+    f'</div>'
+    f'</div>',
     unsafe_allow_html=True,
 )
 
